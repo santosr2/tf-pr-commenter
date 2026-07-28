@@ -1,0 +1,7 @@
+<!-- tf-pr-commenter:shell -->
+## <%= it.header %>
+
+| Stack | Plan | Status |
+|---|---|---|
+<% it.stacks.forEach((stack) => { %>| `<%= stack.name %>` | <%~ stack.planCell %> | <%= stack.statusIcon %> |
+<% }) %>

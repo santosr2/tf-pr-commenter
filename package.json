@@ -1,0 +1,51 @@
+{
+  "name": "tf-pr-commenter",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "One aggregated, budget-aware PR comment for many Terraform/Terragrunt plans.",
+  "main": "lib/index.js",
+  "bin": {
+    "tf-pr-commenter": "lib/cli/index.js"
+  },
+  "engines": {
+    "node": ">=20.0.0 <27.0.0"
+  },
+  "packageManager": "npm@11.16.0",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "lint": "eslint .",
+    "package": "npm run build && ncc build lib/action/index.js -o dist --source-map --license licenses.txt --minify",
+    "ci": "npm run check && npm run lint && npm test && npm run package"
+  },
+  "keywords": [
+    "github-actions",
+    "terraform",
+    "terragrunt",
+    "pull-request",
+    "plan"
+  ],
+  "author": "Rubens Santos <rubenssegundo404@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "@actions/core": "^3.0.1",
+    "@actions/github": "^9.1.1",
+    "eta": "^3.5.0",
+    "fast-glob": "^3.3.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.35.0",
+    "@types/node": "^24.3.1",
+    "@vercel/ncc": "^0.38.3",
+    "@vitest/coverage-v8": "^3.2.4",
+    "eslint": "^9.35.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^16.3.0",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.43.0",
+    "vitest": "^3.2.4"
+  }
+}

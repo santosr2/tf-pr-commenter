@@ -1,0 +1,16 @@
+# mise configuration for consistent project tooling
+# https://mise.jdx.dev/
+
+[tools]
+# Match the GitHub Actions runtime declared in action.yml.
+node = "24"
+
+[tasks]
+install = "npm ci"
+check = "npm run check"
+lint = "npm run lint"
+test = "npm test"
+build = "npm run build"
+package = "npm run package"
+audit = "npm audit --omit=dev"
+ci = "mise run check && mise run lint && mise run test && mise run package"

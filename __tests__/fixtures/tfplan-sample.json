@@ -1,0 +1,41 @@
+{
+  "format_version": "1.2",
+  "resource_changes": [
+    {
+      "address": "aws_s3_bucket.logs",
+      "change": {
+        "actions": ["create"]
+      }
+    },
+    {
+      "address": "aws_instance.app",
+      "change": {
+        "actions": ["update"]
+      }
+    },
+    {
+      "address": "aws_lb.main",
+      "change": {
+        "actions": ["delete", "create"]
+      }
+    },
+    {
+      "address": "aws_iam_role.old",
+      "change": {
+        "actions": ["delete"]
+      }
+    },
+    {
+      "address": "data.aws_caller_identity.current",
+      "change": {
+        "actions": ["read"]
+      }
+    },
+    {
+      "address": "aws_security_group.unchanged",
+      "change": {
+        "actions": ["no-op"]
+      }
+    }
+  ]
+}

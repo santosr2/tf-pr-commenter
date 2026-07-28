@@ -1,0 +1,35 @@
+name: 'TF PR Commenter'
+description: 'One aggregated, budget-aware PR comment for many Terraform/Terragrunt plans.'
+inputs:
+  plan-files:
+    description: 'Newline-separated list OR glob of terraform show -json files.'
+    required: true
+  plan-text-files:
+    description: 'Optional newline list/glob of raw plan text files, paired to plan-files by directory.'
+    required: false
+  github-token:
+    description: 'Token with pull-requests: write.'
+    default: ${{ github.token }}
+  header:
+    description: 'Comment title.'
+    default: '🏗️ Terraform Plan'
+  marker:
+    description: 'Hidden HTML marker for upsert.'
+    default: '<!-- tf-pr-commenter -->'
+  char-budget:
+    description: 'Max comment chars. GitHub hard limit is 65536.'
+    default: '65000'
+  template:
+    description: 'Path to a .eta template or inline template. Defaults to the bundled template.'
+    required: false
+  tool:
+    description: 'auto | terraform | terragrunt. Controls plan-text prefix stripping.'
+    default: 'auto'
+outputs:
+  comment-id:
+    description: 'The created or updated comment id.'
+  body:
+    description: 'The rendered comment body.'
+runs:
+  using: 'node24'
+  main: 'dist/index.js'

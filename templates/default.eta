@@ -1,0 +1,26 @@
+<!-- tf-pr-commenter:detail -->
+<details><summary>📋 <code><%= it.stack.name %></code><% if (it.stack.countsLine) { %> <code><%= it.stack.countsLine %></code><% } %></summary>
+
+```diff
+<%~ it.stack.actionsText + '\n' %>
+```
+
+</details>
+<!-- tf-pr-commenter:shell -->
+<% if (it.stacks.length === 0) { %>
+## <%= it.header %>
+
+✅ No stacks with changes to plan.
+<% } else { %>
+## <%= it.header %> — <%= it.stacks.length %> stack<%= it.stacks.length === 1 ? '' : 's' %>
+
+| Stack | Plan | Status |
+|---|---|---|
+<% it.stacks.forEach((stack) => { %>| `<%= stack.name %>` | <%~ stack.planCell %> | <%= stack.statusIcon %> |
+<% }) %><% if (it.detailSections.length) { %>
+
+<%~ it.detailSections.join('\n\n') %>
+<% } %><% if (it.omittedCount > 0) { %>
+
+> ⚠️ Plan detail for <%= it.omittedCount %> stack<%= it.omittedCount === 1 ? '' : 's' %> omitted to fit the comment size limit — see each job's step summary. Counts above are complete.
+<% } %><% } %>

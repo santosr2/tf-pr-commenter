@@ -1,0 +1,41 @@
+<!-- tf-pr-commenter:detail -->
+<details><summary><code><%= it.stack.name %></code> <code><%= it.stack.countsLine ?? '—' %></code></summary>
+
+```diff
+<%~ it.stack.actionsText + '\n' %>
+```
+
+</details>
+<!-- tf-pr-commenter:shell -->
+## <%= it.header %>
+
+<% const destructive = it.stacks.filter((stack) => stack.counts?.destroy) %>
+<% const changed = it.stacks.filter((stack) => stack.counts?.change && !stack.counts?.destroy) %>
+<% const additive = it.stacks.filter((stack) => stack.counts?.add && !stack.counts?.change && !stack.counts?.destroy) %>
+<% const quiet = it.stacks.filter((stack) => !stack.counts || stack.total === 0) %>
+
+### Destroys Or Replacements
+<% destructive.forEach((stack) => { %>- `<%= stack.name %>` <%~ stack.planCell %> <%= stack.statusIcon %>
+<% }) %><% if (destructive.length === 0) { %>- none
+<% } %>
+
+### Updates
+<% changed.forEach((stack) => { %>- `<%= stack.name %>` <%~ stack.planCell %> <%= stack.statusIcon %>
+<% }) %><% if (changed.length === 0) { %>- none
+<% } %>
+
+### Adds Only
+<% additive.forEach((stack) => { %>- `<%= stack.name %>` <%~ stack.planCell %> <%= stack.statusIcon %>
+<% }) %><% if (additive.length === 0) { %>- none
+<% } %>
+
+### No Changes Or Failed
+<% quiet.forEach((stack) => { %>- `<%= stack.name %>` <%~ stack.planCell %> <%= stack.statusIcon %>
+<% }) %><% if (quiet.length === 0) { %>- none
+<% } %>
+
+<%~ it.detailSections.join('\n\n') %>
+<% if (it.omittedCount) { %>
+
+> Plan detail omitted for <%= it.omittedCount %> stack<%= it.omittedCount === 1 ? '' : 's' %>.
+<% } %>
