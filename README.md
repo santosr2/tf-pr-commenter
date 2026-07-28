@@ -7,6 +7,11 @@ The commenter for when one PR plans many Terraform or Terragrunt stacks.
 per-stack diffs while they fit under GitHub's comment limit. Detail is dropped whole with an explicit
 omission note, never blind-truncated mid-diff.
 
+> [!WARNING]
+> This is an early-stage project and has not been tested in real Terraform/Terragrunt pull-request
+> workflows yet. Review the rendered comment output carefully before relying on it for production
+> infrastructure changes.
+
 ## Usage
 
 ```yaml
@@ -24,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: santosr2/tf-pr-commenter@v1
+      - uses: santosr2/tf-pr-commenter@v0.1.0
         with:
           plan-files: 'artifacts/**/tfplan.json'
           plan-text-files: 'artifacts/**/plan-clean.txt'
@@ -51,7 +56,7 @@ own Terraform or Terragrunt jobs, then run this low-privilege comment job withou
 
 Templates use Eta. A template can provide a detail section and a shell section:
 
-```eta
+````eta
 <!-- tf-pr-commenter:detail -->
 <details><summary><%= it.stack.name %></summary>
 ```diff
@@ -61,7 +66,7 @@ Templates use Eta. A template can provide a detail section and a shell section:
 <!-- tf-pr-commenter:shell -->
 ## <%= it.header %>
 <%~ it.detailSections.join('\n\n') %>
-```
+````
 
 The shell receives the render model plus `detailSections`, which are pre-rendered detail blocks that
 fit the budget.
