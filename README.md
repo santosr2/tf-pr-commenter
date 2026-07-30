@@ -39,6 +39,85 @@ jobs:
 The plan step is intentionally separate. Generate and upload static plan JSON/text artifacts in your
 own Terraform or Terragrunt jobs, then run this low-privilege comment job without cloud credentials.
 
+## Example output
+
+A run over three stacks renders one comment: a complete summary table for every stack, then colored
+per-stack diffs for those that fit the budget. The block below is a live render, so GitHub colors the
+diff exactly as it appears in the posted comment — `+` green (add), `-` red (destroy), and `!` orange
+(change or replace).
+
+---
+
+## 🏗️ Terraform Plan — 3 stacks
+
+| Stack | Plan | Status |
+|---|---|---|
+| `envs/prod/networking` | `+2 ~1 -2` | ✅ |
+| `envs/prod/app` | `+1 ~3 -0` | ✅ |
+| `envs/staging/logging` | — | ⚪ |
+
+<details><summary>📋 <code>envs/prod/networking</code> <code>+2 ~1 -2</code></summary>
+
+```diff
++   resource "aws_s3_bucket" "logs" {
++       bucket = "logs"
+    }
+
+!   resource "aws_instance" "app" {
+!       tags = {
+-           "old" = "yes"
++           "new" = "yes"
+        }
+    }
+
+!   resource "aws_lb" "main" {
+!       name = "old" -> "new"
+    }
+
+-   resource "aws_iam_role" "old" {
+-       name = "old-role"
+    }
+```
+
+</details>
+
+---
+
+The colors come from GitHub's diff highlighter, not from the action. Terraform's `~` (in-place update)
+and `-/+` (replace) markers are rewritten to `!` and moved to column 0 so the highlighter renders them
+as changed lines. Stacks with no changes show `—` and a ⚪ status, and their detail block is skipped
+entirely. When detail blocks would exceed `char-budget`, whole stacks are dropped with an explicit
+omission note while the summary table above stays complete.
+
+<details><summary>Raw Markdown the action posts</summary>
+
+````markdown
+<!-- tf-pr-commenter -->
+
+## 🏗️ Terraform Plan — 3 stacks
+
+| Stack | Plan | Status |
+|---|---|---|
+| `envs/prod/networking` | `+2 ~1 -2` | ✅ |
+| `envs/prod/app` | `+1 ~3 -0` | ✅ |
+| `envs/staging/logging` | — | ⚪ |
+
+<details><summary>📋 <code>envs/prod/networking</code> <code>+2 ~1 -2</code></summary>
+
+```diff
++   resource "aws_s3_bucket" "logs" {
++       bucket = "logs"
+    }
+
+!   resource "aws_instance" "app" {
+...
+```
+
+</details>
+````
+
+</details>
+
 ## Inputs
 
 | Input | Description | Default |
