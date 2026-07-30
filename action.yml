@@ -1,9 +1,12 @@
 name: 'TF PR Commenter'
 description: 'One aggregated, budget-aware PR comment for many Terraform/Terragrunt plans.'
 inputs:
+  plan-root:
+    description: 'Directory of downloaded plan-*/ artifact subdirs (each with tfplan.json + plan-meta.json). Surfaces FAILED stacks that the plan-files glob misses. Takes precedence over plan-files.'
+    required: false
   plan-files:
-    description: 'Newline-separated list OR glob of terraform show -json files.'
-    required: true
+    description: 'Newline-separated list OR glob of terraform show -json files. Used when plan-root is unset.'
+    required: false
   plan-text-files:
     description: 'Optional newline list/glob of raw plan text files, paired to plan-files by directory.'
     required: false

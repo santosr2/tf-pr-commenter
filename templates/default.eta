@@ -7,12 +7,17 @@
 
 </details>
 <!-- tf-pr-commenter:shell -->
+<%/*
+Eta's default autoTrim ('nl') removes one newline after each closing tag.
+Keep two blank lines after the H2 line below so one survives before the table.
+*/%>
 <% if (it.stacks.length === 0) { %>
 ## <%= it.header %>
 
 ✅ No stacks with changes to plan.
 <% } else { %>
 ## <%= it.header %> — <%= it.stacks.length %> stack<%= it.stacks.length === 1 ? '' : 's' %>
+
 
 | Stack | Plan | Status |
 |---|---|---|

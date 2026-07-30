@@ -4,7 +4,11 @@ import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { stackFromArtifact } from '../src/core/artifact.js'
+import {
+  loadStacksFromArtifactRoot,
+  stackFromArtifact
+} from '../src/core/artifact.js'
+import { DEFAULT_TEMPLATE } from '../src/core/default-template.generated.js'
 import { countsLine, type StackPlan } from '../src/core/model.js'
 import { render } from '../src/core/render.js'
 import { summarize } from '../src/core/summarize.js'
@@ -13,6 +17,15 @@ import { trimDiff } from '../src/core/trim.js'
 const fixture = (name: string): string => join(import.meta.dirname, 'fixtures', name)
 
 describe('core terraform plan rendering', () => {
+  it('keeps the generated default template in sync with templates/default.eta', async () => {
+    expect(DEFAULT_TEMPLATE).toBe(
+      await readFile(
+        join(import.meta.dirname, '..', 'templates', 'default.eta'),
+        'utf8'
+      )
+    )
+  })
+
   it('counts resource actions with replacements counted as add and destroy', async () => {
     const plan = JSON.parse(await readFile(fixture('tfplan-sample.json'), 'utf8'))
 
@@ -155,6 +168,41 @@ omitted=<%= it.omittedCount %>
     expect(stack.counts).toEqual({ add: 2, change: 1, destroy: 2, replace: 1 })
     expect(stack.actionsText).toMatch(/^! +resource "aws_instance"/m)
     expect(stack.status).toBe('changes')
+  })
+
+  it('scans an artifact root, surfacing failed stacks that have no tfplan.json', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'tf-pr-commenter-'))
+    const fs = await import('node:fs/promises')
+
+    const changed = join(root, 'plan-prod-api')
+    await fs.mkdir(changed, { recursive: true })
+    await writeFile(
+      join(changed, 'plan-meta.json'),
+      JSON.stringify({ path: 'prod/api', status: 'changes' })
+    )
+    await writeFile(
+      join(changed, 'tfplan.json'),
+      await readFile(fixture('tfplan-sample.json'), 'utf8')
+    )
+
+    // A failed stack carries only plan-meta.json — the plan-files glob would miss it.
+    const failed = join(root, 'plan-prod-db')
+    await fs.mkdir(failed, { recursive: true })
+    await writeFile(
+      join(failed, 'plan-meta.json'),
+      JSON.stringify({ path: 'prod/db', status: 'failure' })
+    )
+
+    const stacks = await loadStacksFromArtifactRoot(root)
+
+    expect(stacks.map((s) => s.path).sort()).toEqual(['prod/api', 'prod/db'])
+    const failedStack = stacks.find((s) => s.path === 'prod/db')
+    expect(failedStack?.status).toBe('failed')
+    expect(failedStack?.counts).toBeNull()
+  })
+
+  it('returns no stacks when the artifact root does not exist', async () => {
+    expect(await loadStacksFromArtifactRoot(join(tmpdir(), 'tf-pr-commenter-missing-xyz'))).toEqual([])
   })
 })
 

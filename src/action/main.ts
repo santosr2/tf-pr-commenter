@@ -6,8 +6,10 @@ import * as github from '@actions/github'
 
 import {
   expandInputFiles,
+  loadStacksFromArtifactRoot,
   stackFromFiles
 } from '../core/artifact.js'
+import type { StackPlan } from '../core/model.js'
 import { render } from '../core/render.js'
 import type { Tool } from '../core/trim.js'
 import { upsertComment } from '../github/comment.js'
@@ -15,27 +17,15 @@ import { upsertComment } from '../github/comment.js'
 export async function run(): Promise<void> {
   try {
     const cwd = process.env.GITHUB_WORKSPACE ?? process.cwd()
-    const planFiles = await expandInputFiles(core.getInput('plan-files'), cwd)
-    const planTextInput = core.getInput('plan-text-files')
-    const planTextFiles = planTextInput
-      ? await expandInputFiles(planTextInput, cwd)
-      : []
-    const planTextByDirectory = new Map(
-      planTextFiles.map((file) => [dirname(file), file])
-    )
     const tool = parseTool(core.getInput('tool') || 'auto')
-    const stacks = await Promise.all(
-      planFiles.map((planFile) => {
-        const planTextFile = planTextByDirectory.get(dirname(planFile))
-        return stackFromFiles({
-          planFile,
-          metaFile: join(dirname(planFile), 'plan-meta.json'),
-          cwd,
-          tool,
-          ...(planTextFile ? { planTextFile } : {})
-        })
-      })
-    )
+    // Two discovery modes:
+    //   plan-root  — scan an artifact dir of plan-*/ subdirs. Surfaces FAILED stacks
+    //                (only plan-meta.json, no tfplan.json) that the plan-files glob misses.
+    //   plan-files — glob tfplan.json files directly (one stack per file).
+    const planRoot = core.getInput('plan-root')
+    const stacks = planRoot
+      ? await loadStacksFromArtifactRoot(resolve(cwd, planRoot), tool)
+      : await loadStacksFromPlanFiles(cwd, tool)
     const template = await readTemplateInput(core.getInput('template'), cwd)
     const marker = core.getInput('marker') || '<!-- tf-pr-commenter -->'
     const renderOptions = {
@@ -66,6 +56,33 @@ export async function run(): Promise<void> {
   } catch (error) {
     core.setFailed(error instanceof Error ? error.message : String(error))
   }
+}
+
+async function loadStacksFromPlanFiles(
+  cwd: string,
+  tool: Tool
+): Promise<StackPlan[]> {
+  const planFiles = await expandInputFiles(core.getInput('plan-files'), cwd)
+  const planTextInput = core.getInput('plan-text-files')
+  const planTextFiles = planTextInput
+    ? await expandInputFiles(planTextInput, cwd)
+    : []
+  const planTextByDirectory = new Map(
+    planTextFiles.map((file) => [dirname(file), file])
+  )
+
+  return Promise.all(
+    planFiles.map((planFile) => {
+      const planTextFile = planTextByDirectory.get(dirname(planFile))
+      return stackFromFiles({
+        planFile,
+        metaFile: join(dirname(planFile), 'plan-meta.json'),
+        cwd,
+        tool,
+        ...(planTextFile ? { planTextFile } : {})
+      })
+    })
+  )
 }
 
 function parseBudget(input: string): number {

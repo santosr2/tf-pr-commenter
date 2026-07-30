@@ -75,6 +75,12 @@ export async function loadStacksFromArtifactRoot(
   root: string,
   tool: Tool = 'auto'
 ): Promise<StackPlan[]> {
+  // Tolerate a missing root (e.g. the download step produced no artifacts): render
+  // an empty comment rather than throwing, matching a no-stacks-to-plan run.
+  if (!(await fileExists(root))) {
+    return []
+  }
+
   const entries = await readdir(root)
   const directories: string[] = []
 

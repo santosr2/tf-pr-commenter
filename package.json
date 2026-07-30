@@ -1,6 +1,6 @@
 {
   "name": "tf-pr-commenter",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "One aggregated, budget-aware PR comment for many Terraform/Terragrunt plans.",
   "main": "lib/index.js",
@@ -12,8 +12,10 @@
   },
   "packageManager": "npm@11.16.0",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "check": "tsc --noEmit -p tsconfig.json",
+    "generate:templates": "node scripts/generate-default-template.mjs",
+    "check:templates": "node scripts/generate-default-template.mjs --check",
+    "build": "npm run generate:templates && tsc -p tsconfig.json",
+    "check": "npm run check:templates && tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "lint": "eslint .",
     "package": "npm run build && ncc build lib/action/index.js -o dist --source-map --license licenses.txt --minify",
