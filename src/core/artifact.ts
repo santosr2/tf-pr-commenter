@@ -91,8 +91,24 @@ export async function loadStacksFromArtifactRoot(
     }
   }
 
+  // actions/download-artifact only namespaces each artifact into its own subdir
+  // when it downloads more than one; a lone matched artifact is extracted flat
+  // into the root (v8 made this explicit with an `artifacts.length === 1` guard).
+  // Treat that flat root as a single stack so single-stack PRs aren't misreported
+  // as "no changes". A failed stack has only plan-meta.json, so probe for either.
+  if (directories.length === 0 && (await isArtifactDir(root))) {
+    return [await stackFromArtifact(root, tool)]
+  }
+
   return Promise.all(
     directories.map((directory) => stackFromArtifact(directory, tool))
+  )
+}
+
+async function isArtifactDir(directory: string): Promise<boolean> {
+  return (
+    (await fileExists(join(directory, 'tfplan.json'))) ||
+    (await fileExists(join(directory, 'plan-meta.json')))
   )
 }
 
