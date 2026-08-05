@@ -11,8 +11,11 @@ inputs:
     description: 'Optional newline list/glob of raw plan text files, paired to plan-files by directory.'
     required: false
   github-token:
-    description: 'Token with pull-requests: write.'
+    description: 'Token with pull-requests: write (and actions: read to enable warn-on-failed-jobs).'
     default: ${{ github.token }}
+  warn-on-failed-jobs:
+    description: 'Prepend a banner naming jobs in this run that failed or were cancelled, so the comment never reads as success while a job actually failed (e.g. a job that produced no artifact). Needs actions: read on github-token; silently skipped if not granted.'
+    default: 'true'
   header:
     description: 'Comment title.'
     default: '🏗️ Terraform Plan'
