@@ -201,6 +201,31 @@ omitted=<%= it.omittedCount %>
     expect(failedStack?.counts).toBeNull()
   })
 
+  it('scans a flat root when download-artifact extracts a lone artifact without a subdir', async () => {
+    // A single-stack PR yields one artifact; download-artifact drops it flat into
+    // the root instead of a plan-*/ subdir. The root itself is the stack dir.
+    const root = await mkdtemp(join(tmpdir(), 'tf-pr-commenter-'))
+    await writeFile(
+      join(root, 'plan-meta.json'),
+      JSON.stringify({ path: 'shared/common/databases/internal_tools', status: 'changes' })
+    )
+    await writeFile(
+      join(root, 'tfplan.json'),
+      await readFile(fixture('tfplan-sample.json'), 'utf8')
+    )
+    await writeFile(
+      join(root, 'plan-clean.txt'),
+      await readFile(fixture('plan-actions-sample.txt'), 'utf8')
+    )
+
+    const stacks = await loadStacksFromArtifactRoot(root)
+
+    expect(stacks).toHaveLength(1)
+    expect(stacks[0]?.path).toBe('shared/common/databases/internal_tools')
+    expect(stacks[0]?.status).toBe('changes')
+    expect(stacks[0]?.counts).toEqual({ add: 2, change: 1, destroy: 2, replace: 1 })
+  })
+
   it('returns no stacks when the artifact root does not exist', async () => {
     expect(await loadStacksFromArtifactRoot(join(tmpdir(), 'tf-pr-commenter-missing-xyz'))).toEqual([])
   })
