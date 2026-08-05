@@ -13,6 +13,7 @@ import type { StackPlan } from '../core/model.js'
 import { render } from '../core/render.js'
 import type { Tool } from '../core/trim.js'
 import { upsertComment } from '../github/comment.js'
+import { failedJobsBanner, failedOrCancelledJobs } from '../github/jobs.js'
 
 export async function run(): Promise<void> {
   try {
@@ -34,7 +35,7 @@ export async function run(): Promise<void> {
       marker,
       ...(template ? { template } : {})
     }
-    const body = render(stacks, renderOptions)
+    let body = render(stacks, renderOptions)
     const pullRequestNumber = github.context.payload.pull_request?.number
     if (!pullRequestNumber) {
       throw new Error('tf-pr-commenter must run in a pull_request context')
@@ -42,6 +43,24 @@ export async function run(): Promise<void> {
 
     const token = core.getInput('github-token', { required: true })
     const octokit = github.getOctokit(token)
+
+    // A comment rendered from artifacts alone can't tell "no changes" apart from "a job
+    // failed/cancelled and emitted nothing". Query this run's job conclusions and, if any
+    // failed or were cancelled, prepend a banner so the comment never reads as success while
+    // a job actually failed. Needs `actions: read`; failedOrCancelledJobs degrades to [].
+    if (core.getBooleanInput('warn-on-failed-jobs')) {
+      const failed = await failedOrCancelledJobs({
+        octokit,
+        owner: github.context.repo.owner,
+        repo: github.context.repo.repo,
+        runId: github.context.runId
+      })
+      const banner = failedJobsBanner(failed)
+      if (banner) {
+        body = insertAfterMarker(body, marker, banner)
+      }
+    }
+
     const comment = await upsertComment({
       octokit,
       owner: github.context.repo.owner,
@@ -92,6 +111,20 @@ function parseBudget(input: string): number {
   }
 
   return budget
+}
+
+// upsertComment locates the comment via body.startsWith(marker), so the marker must stay
+// first. Insert the banner immediately after it.
+function insertAfterMarker(
+  body: string,
+  marker: string,
+  insertion: string
+): string {
+  if (!body.startsWith(marker)) {
+    return `${marker}\n\n${insertion}\n\n${body}`
+  }
+
+  return `${marker}\n\n${insertion}${body.slice(marker.length)}`
 }
 
 function parseTool(input: string): Tool {
