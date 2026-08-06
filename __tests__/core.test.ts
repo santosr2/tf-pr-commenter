@@ -11,7 +11,7 @@ import {
 import { DEFAULT_TEMPLATE } from '../src/core/default-template.generated.js'
 import { countsLine, type StackPlan } from '../src/core/model.js'
 import { render } from '../src/core/render.js'
-import { summarize } from '../src/core/summarize.js'
+import { summarize, summarizeDrift } from '../src/core/summarize.js'
 import { trimDiff } from '../src/core/trim.js'
 
 const fixture = (name: string): string => join(import.meta.dirname, 'fixtures', name)
@@ -91,6 +91,7 @@ Plan: 0 to add, 1 to change, 0 to destroy.
         path: 'prod/failed',
         counts: null,
         actionsText: null,
+        drift: [],
         status: 'failed'
       }
     ])
@@ -106,6 +107,7 @@ Plan: 0 to add, 1 to change, 0 to destroy.
         path: 'prod/api',
         counts: { add: 1, change: 0, destroy: 0, replace: 0 },
         actionsText: trimDiff(await readFile(fixture('plan-actions-sample.txt'), 'utf8')),
+        drift: [],
         status: 'changes'
       }
     ])
@@ -229,6 +231,50 @@ omitted=<%= it.omittedCount %>
   it('returns no stacks when the artifact root does not exist', async () => {
     expect(await loadStacksFromArtifactRoot(join(tmpdir(), 'tf-pr-commenter-missing-xyz'))).toEqual([])
   })
+
+  it('summarizes resource_drift, labelling replacements and dropping no-op refreshes', async () => {
+    const planJson = JSON.parse(await readFile(fixture('tfplan-drift-sample.json'), 'utf8'))
+
+    expect(summarizeDrift(planJson)).toEqual([
+      { address: 'module.security_group.aws_security_group.this[0]', action: 'update' },
+      { address: 'module.db.aws_db_instance.this[0]', action: 'replace' }
+    ])
+  })
+
+  it('renders a drift badge and a "Changed outside Terraform" block', () => {
+    const body = render([
+      {
+        name: 'prod-api',
+        path: 'prod/api',
+        counts: { add: 0, change: 1, destroy: 0, replace: 0 },
+        actionsText: '!   resource "aws_db_instance" "this" {',
+        drift: [{ address: 'module.sg.aws_security_group.this[0]', action: 'update' }],
+        status: 'changes'
+      }
+    ])
+
+    expect(body).toContain('| `prod-api` | `+0 ~1 -0` | ✅ ⚠️ 1 drifted |')
+    expect(body).toContain('**⚠️ Changed outside Terraform:**')
+    expect(body).toContain('! module.sg.aws_security_group.this[0] (update)')
+  })
+
+  it('surfaces a drift-only stack that has no planned actions', () => {
+    const body = render([
+      {
+        name: 'prod-db',
+        path: 'prod/db',
+        counts: { add: 0, change: 0, destroy: 0, replace: 0 },
+        actionsText: null,
+        drift: [{ address: 'module.db.aws_db_instance.this[0]', action: 'replace' }],
+        status: 'changes'
+      }
+    ])
+
+    // +0 ~0 -0 with no diff, but the drift is still visible in the table and a detail block.
+    expect(body).toContain('⚠️ 1 drifted')
+    expect(body).toContain('<details>')
+    expect(body).toContain('! module.db.aws_db_instance.this[0] (replace)')
+  })
 })
 
 function makeLargeStacks(count: number): StackPlan[] {
@@ -241,6 +287,7 @@ function makeLargeStacks(count: number): StackPlan[] {
       ...Array.from({ length: 12 }, (__, line) => `+     attr_${line} = "${'x'.repeat(24)}"`),
       '+   }'
     ].join('\n'),
+    drift: [],
     status: 'changes'
   }))
 }

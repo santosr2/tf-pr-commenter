@@ -4,7 +4,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:pat
 import fg from 'fast-glob'
 
 import type { StackPlan } from './model.js'
-import { summarize } from './summarize.js'
+import { summarize, summarizeDrift } from './summarize.js'
 import type { Tool } from './trim.js'
 import { trimDiff } from './trim.js'
 
@@ -26,6 +26,7 @@ export async function stackFromFiles(
   const meta = await readMetadata(metaFile)
   const planJson = JSON.parse(await readFile(planFile, 'utf8')) as unknown
   const counts = summarize(planJson)
+  const drift = summarizeDrift(planJson)
   const planTextFile = options.planTextFile
     ? resolve(cwd, options.planTextFile)
     : null
@@ -40,6 +41,7 @@ export async function stackFromFiles(
     path: stackPath,
     counts,
     actionsText: actionsText || null,
+    drift,
     status
   }
 }
@@ -52,9 +54,11 @@ export async function stackFromArtifact(
   const meta = await readMetadata(join(artifactDirectory, 'plan-meta.json'))
   const planFile = join(artifactDirectory, 'tfplan.json')
   const planTextFile = join(artifactDirectory, 'plan-clean.txt')
-  const counts = (await fileExists(planFile))
-    ? summarize(JSON.parse(await readFile(planFile, 'utf8')) as unknown)
+  const planJson = (await fileExists(planFile))
+    ? (JSON.parse(await readFile(planFile, 'utf8')) as unknown)
     : null
+  const counts = planJson === null ? null : summarize(planJson)
+  const drift = planJson === null ? [] : summarizeDrift(planJson)
   const actionsText = (await fileExists(planTextFile))
     ? trimDiff(await readFile(planTextFile, 'utf8'), tool)
     : ''
@@ -67,6 +71,7 @@ export async function stackFromArtifact(
     path: stackPath,
     counts,
     actionsText: actionsText || null,
+    drift,
     status
   }
 }
