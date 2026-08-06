@@ -2,6 +2,7 @@ import {
   STATUS_ICON,
   countsLine,
   countsTotal,
+  driftText,
   type Counts,
   type RenderModel,
   type StackPlan,
@@ -30,9 +31,12 @@ export function render(stacks: StackPlan[], options: RenderOptions = {}): string
   const marker = options.marker ?? DEFAULT_MARKER
   const templateParts = compileTemplate(options.template ?? DEFAULT_TEMPLATE)
   const stackViews = stacks.map(toStackView)
+  // A drift-only stack (objects changed outside Terraform, no planned action) has no
+  // actionsText but still warrants a detail block, so include it as a candidate and
+  // weight the budget ordering by drift too.
   const candidates = [...stackViews]
-    .filter((stack) => stack.actionsText)
-    .sort((a, b) => b.total - a.total)
+    .filter((stack) => stack.actionsText || stack.driftText)
+    .sort((a, b) => b.total + b.driftCount - (a.total + a.driftCount))
 
   const included: StackPlanView[] = []
   const detailSections: string[] = []
@@ -107,7 +111,9 @@ function toStackView(stack: StackPlan): StackPlanView {
     countsLine: line,
     planCell: line ? `\`${line}\`` : '—',
     total: stack.counts ? countsTotal(stack.counts) : 0,
-    statusIcon: STATUS_ICON[stack.status]
+    statusIcon: STATUS_ICON[stack.status],
+    driftCount: stack.drift.length,
+    driftText: driftText(stack.drift)
   }
 }
 

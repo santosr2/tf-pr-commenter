@@ -1,4 +1,4 @@
-import { type Counts, zeroCounts } from './model.js'
+import { type Counts, type DriftItem, zeroCounts } from './model.js'
 
 export function summarize(planJson: unknown): Counts {
   const counts = zeroCounts()
@@ -35,6 +35,56 @@ export function summarize(planJson: unknown): Counts {
   }
 
   return counts
+}
+
+// resource_drift lists objects Terraform found changed outside its control during
+// refresh. It's a sibling of resource_changes in the plan JSON and is otherwise
+// invisible in the counts, since a drift entry need not produce a planned action.
+export function summarizeDrift(planJson: unknown): DriftItem[] {
+  const root = asRecord(planJson)
+  const resourceDrift = root ? root.resource_drift : undefined
+
+  if (!Array.isArray(resourceDrift)) {
+    return []
+  }
+
+  const items: DriftItem[] = []
+  for (const entry of resourceDrift) {
+    const record = asRecord(entry)
+    const change = asRecord(record?.change)
+    const actions = change?.actions
+
+    if (!record || typeof record.address !== 'string' || !Array.isArray(actions)) {
+      continue
+    }
+
+    const actionNames = actions.filter(
+      (action): action is string => typeof action === 'string'
+    )
+    const action = driftAction(actionNames)
+
+    if (action) {
+      items.push({ address: record.address, action })
+    }
+  }
+
+  return items
+}
+
+// Collapse the actions array to a single label. A refreshed object with no real
+// change carries ['no-op'] and is dropped; delete+create is a replacement.
+function driftAction(actions: string[]): string | null {
+  const real = actions.filter((action) => action !== 'no-op')
+
+  if (real.length === 0) {
+    return null
+  }
+
+  if (real.includes('delete') && real.includes('create')) {
+    return 'replace'
+  }
+
+  return real[0] ?? null
 }
 
 function isSameActions(actual: string[], expected: string[]): boolean {

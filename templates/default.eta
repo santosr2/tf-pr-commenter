@@ -1,11 +1,17 @@
 <!-- tf-pr-commenter:detail -->
-<details><summary>📋 <code><%= it.stack.name %></code><% if (it.stack.countsLine) { %> <code><%= it.stack.countsLine %></code><% } %></summary>
+<details><summary>📋 <code><%= it.stack.name %></code><% if (it.stack.countsLine) { %> <code><%= it.stack.countsLine %></code><% } %><% if (it.stack.driftCount) { %> ⚠️ <%= it.stack.driftCount %> drifted<% } %></summary>
 
-```diff
+<% if (it.stack.actionsText) { %>```diff
 <%~ it.stack.actionsText + '\n' %>
 ```
 
-</details>
+<% } %><% if (it.stack.driftText) { %>**⚠️ Changed outside Terraform:**
+
+```diff
+<%~ it.stack.driftText + '\n' %>
+```
+
+<% } %></details>
 <!-- tf-pr-commenter:shell -->
 <%/*
 Eta's default autoTrim ('nl') removes one newline after each closing tag.
@@ -21,7 +27,7 @@ Keep two blank lines after the H2 line below so one survives before the table.
 
 | Stack | Plan | Status |
 |---|---|---|
-<% it.stacks.forEach((stack) => { %>| `<%= stack.name %>` | <%~ stack.planCell %> | <%= stack.statusIcon %> |
+<% it.stacks.forEach((stack) => { %>| `<%= stack.name %>` | <%~ stack.planCell %> | <%= stack.statusIcon %><% if (stack.driftCount) { %> ⚠️ <%= stack.driftCount %> drifted<% } %> |
 <% }) %><% if (it.detailSections.length) { %>
 
 <%~ it.detailSections.join('\n\n') %>

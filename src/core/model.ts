@@ -5,6 +5,12 @@ export interface Counts {
   replace: number
 }
 
+// A resource changed outside Terraform, from the plan JSON's resource_drift array.
+export interface DriftItem {
+  address: string
+  action: string
+}
+
 export type Status = 'changes' | 'no-changes' | 'failed'
 
 export interface StackPlan {
@@ -12,6 +18,7 @@ export interface StackPlan {
   path: string
   counts: Counts | null
   actionsText: string | null
+  drift: DriftItem[]
   status: Status
 }
 
@@ -20,6 +27,8 @@ export interface StackPlanView extends StackPlan {
   planCell: string
   total: number
   statusIcon: string
+  driftCount: number
+  driftText: string | null
 }
 
 export interface RenderModel {
@@ -48,4 +57,23 @@ export function countsTotal(counts: Counts): number {
 
 export function zeroCounts(): Counts {
   return { add: 0, change: 0, destroy: 0, replace: 0 }
+}
+
+const DRIFT_MARKER: Record<string, string> = {
+  update: '!',
+  delete: '-',
+  create: '+',
+  replace: '!'
+}
+
+// A diff-flavoured block listing each object that changed outside Terraform, so it
+// renders in the same ```diff fence as the plan actions.
+export function driftText(drift: DriftItem[]): string | null {
+  if (drift.length === 0) {
+    return null
+  }
+
+  return drift
+    .map((item) => `${DRIFT_MARKER[item.action] ?? '!'} ${item.address} (${item.action})`)
+    .join('\n')
 }
