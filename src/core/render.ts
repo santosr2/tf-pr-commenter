@@ -2,7 +2,6 @@ import {
   STATUS_ICON,
   countsLine,
   countsTotal,
-  driftText,
   type Counts,
   type RenderModel,
   type StackPlan,
@@ -14,6 +13,7 @@ import {
   compileTemplate,
   renderTemplate
 } from './template.js'
+import { countDrift } from './trim.js'
 
 export interface RenderOptions {
   budget?: number
@@ -112,8 +112,7 @@ function toStackView(stack: StackPlan): StackPlanView {
     planCell: line ? `\`${line}\`` : '—',
     total: stack.counts ? countsTotal(stack.counts) : 0,
     statusIcon: STATUS_ICON[stack.status],
-    driftCount: stack.drift.length,
-    driftText: driftText(stack.drift)
+    driftCount: countDrift(stack.driftText)
   }
 }
 
