@@ -1,0 +1,21 @@
+00:00:49.041 STDOUT terraform: module.master.module.db_instance.aws_db_instance.this[0]: Refreshing state... [id=db-XYZ]
+00:00:49.042 STDOUT terraform: Note: Objects have changed outside of Terraform
+00:00:49.042 STDOUT terraform: 
+00:00:49.042 STDOUT terraform: Terraform detected the following changes made outside of Terraform since the
+00:00:49.042 STDOUT terraform: last "terraform apply" which may have affected this plan:
+00:00:49.042 STDOUT terraform:   # module.master.module.db_instance.aws_db_instance.this[0] has changed
+00:00:49.042 STDOUT terraform:   ~ resource "aws_db_instance" "this" {
+00:00:49.042 STDOUT terraform:       + domain_dns_ips                        = []
+00:00:49.042 STDOUT terraform:         id                                    = "db-XYZ"
+00:00:49.042 STDOUT terraform:         # (75 unchanged attributes hidden)
+00:00:49.042 STDOUT terraform:     }
+00:00:49.042 STDOUT terraform: Unless you have made equivalent changes to your configuration, or ignored the
+00:00:49.042 STDOUT terraform: relevant attributes using ignore_changes, the following plan may include
+00:00:49.042 STDOUT terraform: actions to undo or respond to these changes.
+00:00:49.042 STDOUT terraform: 
+00:00:49.042 STDOUT terraform: Terraform will perform the following actions:
+00:00:49.042 STDOUT terraform:   # module.master.module.db_instance.aws_db_instance.this[0] will be updated in-place
+00:00:49.042 STDOUT terraform:   ~ resource "aws_db_instance" "this" {
+00:00:49.042 STDOUT terraform:       ~ deletion_protection                   = false -> true
+00:00:49.042 STDOUT terraform:     }
+00:00:49.042 STDOUT terraform: Plan: 0 to add, 1 to change, 0 to destroy.

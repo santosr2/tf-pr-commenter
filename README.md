@@ -53,7 +53,7 @@ diff exactly as it appears in the posted comment — `+` green (add), `-` red (d
 | Stack | Plan | Status |
 |---|---|---|
 | `envs/prod/networking` | `+2 ~1 -2` | ✅ |
-| `envs/prod/app` | `+1 ~3 -0` | ✅ |
+| `envs/prod/app` | `+0 ~1 -0` | ✅ ⚠️ 1 drifted |
 | `envs/staging/logging` | — | ⚪ |
 
 <details><summary>📋 <code>envs/prod/networking</code> <code>+2 ~1 -2</code></summary>
@@ -81,6 +81,25 @@ diff exactly as it appears in the posted comment — `+` green (add), `-` red (d
 
 </details>
 
+<details><summary>📋 <code>envs/prod/app</code> <code>+0 ~1 -0</code> ⚠️ 1 drifted</summary>
+
+```diff
+!   resource "aws_db_instance" "app" {
+!       deletion_protection = false -> true
+    }
+```
+
+**⚠️ Changed outside Terraform:**
+
+```diff
+  # aws_db_instance.app has changed
+!   resource "aws_db_instance" "app" {
++       domain_dns_ips = []
+    }
+```
+
+</details>
+
 ---
 
 The colors come from GitHub's diff highlighter, not from the action. Terraform's `~` (in-place update)
@@ -88,6 +107,12 @@ and `-/+` (replace) markers are rewritten to `!` and moved to column 0 so the hi
 as changed lines. Stacks with no changes show `—` and a ⚪ status, and their detail block is skipped
 entirely. When detail blocks would exceed `char-budget`, whole stacks are dropped with an explicit
 omission note while the summary table above stays complete.
+
+A `⚠️ N drifted` badge marks stacks where Terraform detected objects changed **outside** Terraform.
+The drift is taken from Terraform's own "Objects have changed outside of Terraform" report (its
+schema-filtered view — so it excludes computed and `ignore_changes` churn) and rendered in a separate
+"Changed outside Terraform" block. A stack can be drift-only: `+0 ~0 -0` with a badge and a drift block
+but no plan actions.
 
 <details><summary>Raw Markdown the action posts</summary>
 
@@ -99,7 +124,7 @@ omission note while the summary table above stays complete.
 | Stack | Plan | Status |
 |---|---|---|
 | `envs/prod/networking` | `+2 ~1 -2` | ✅ |
-| `envs/prod/app` | `+1 ~3 -0` | ✅ |
+| `envs/prod/app` | `+0 ~1 -0` | ✅ ⚠️ 1 drifted |
 | `envs/staging/logging` | — | ⚪ |
 
 <details><summary>📋 <code>envs/prod/networking</code> <code>+2 ~1 -2</code></summary>
@@ -111,6 +136,25 @@ omission note while the summary table above stays complete.
 
 !   resource "aws_instance" "app" {
 ...
+```
+
+</details>
+
+<details><summary>📋 <code>envs/prod/app</code> <code>+0 ~1 -0</code> ⚠️ 1 drifted</summary>
+
+```diff
+!   resource "aws_db_instance" "app" {
+!       deletion_protection = false -> true
+    }
+```
+
+**⚠️ Changed outside Terraform:**
+
+```diff
+  # aws_db_instance.app has changed
+!   resource "aws_db_instance" "app" {
++       domain_dns_ips = []
+    }
 ```
 
 </details>
@@ -161,8 +205,10 @@ fit the budget.
 | `totals` | Summed `add`, `change`, `destroy`, and `replace` counts. |
 | `statusIcon` | Status to icon map for `changes`, `no-changes`, and `failed`. |
 
-Each stack has `name`, `path`, `counts`, `actionsText`, `status`, `countsLine`, `planCell`, `total`,
-and `statusIcon`.
+Each stack has `name`, `path`, `counts`, `actionsText`, `driftText`, `status`, `countsLine`,
+`planCell`, `total`, `statusIcon`, and `driftCount`. `driftText` is Terraform's rendered
+"Objects have changed outside of Terraform" block (or null), and `driftCount` is the number of
+resources in it.
 
 See `templates/default.eta`, `examples/compact.eta`, and `examples/grouped-by-action.eta`.
 

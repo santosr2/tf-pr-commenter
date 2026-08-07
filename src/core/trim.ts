@@ -3,6 +3,16 @@ export type Tool = 'auto' | 'terraform' | 'terragrunt'
 const TERRAGRUNT_TERRAFORM_LINE = /^\d\S*\s+\w+\s+terraform:\s?(.*)$/
 const CHANGE_MARKER = /^(\s*)(-\/\+|\+\/-|[+~-]) /
 const ACTIONS_HEADER = 'will perform the following actions'
+// Terraform's drift report. Its intro spans two lines ending in this phrase; the
+// body of "# <addr> has changed" blocks follows, terminated by any of DRIFT_END.
+const DRIFT_HEADER = 'Objects have changed outside of Terraform'
+const DRIFT_INTRO_END = 'may have affected this plan'
+const DRIFT_END = [
+  'Unless you have made equivalent changes',
+  ACTIONS_HEADER,
+  'Terraform used the selected providers',
+  '─'
+]
 const MARKER_MAP: Record<string, string> = {
   '~': '!',
   '-/+': '!',
@@ -27,6 +37,45 @@ export function trimDiff(planText: string, tool: Tool = 'auto'): string {
   }
 
   return body.join('\n').replace(/^\n+|\n+$/gu, '')
+}
+
+// Terraform's "Objects have changed outside of Terraform" section is the schema-filtered
+// view of drift — it already drops churn on computed and ignore_changes'd attributes that
+// the plan JSON's resource_drift array still carries. Sourcing drift from this text keeps
+// the comment aligned with what the plan output actually shows a reviewer.
+export function trimDrift(planText: string, tool: Tool = 'auto'): string {
+  const lines = normalizeToolLines(planText, tool)
+  const headerIndex = lines.findIndex((line) => line.includes(DRIFT_HEADER))
+
+  if (headerIndex === -1) {
+    return ''
+  }
+
+  // Skip the two-line intro so the body starts at the first "# <addr> has changed".
+  const introOffset = lines
+    .slice(headerIndex)
+    .findIndex((line) => line.includes(DRIFT_INTRO_END))
+  const start = introOffset === -1 ? headerIndex : headerIndex + introOffset
+
+  const body: string[] = []
+  for (const line of lines.slice(start + 1)) {
+    if (DRIFT_END.some((marker) => line.includes(marker))) {
+      break
+    }
+
+    body.push(shiftChangeMarker(line))
+  }
+
+  return body.join('\n').replace(/^\n+|\n+$/gu, '')
+}
+
+// Count of drifted resources, one per "# <addr> has changed" header in the drift text.
+export function countDrift(driftText: string | null): number {
+  if (!driftText) {
+    return 0
+  }
+
+  return (driftText.match(/^\s*# .* has changed$/gmu) ?? []).length
 }
 
 function normalizeToolLines(planText: string, tool: Tool): string[] {

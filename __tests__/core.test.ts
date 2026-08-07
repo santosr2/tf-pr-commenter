@@ -11,8 +11,8 @@ import {
 import { DEFAULT_TEMPLATE } from '../src/core/default-template.generated.js'
 import { countsLine, type StackPlan } from '../src/core/model.js'
 import { render } from '../src/core/render.js'
-import { summarize, summarizeDrift } from '../src/core/summarize.js'
-import { trimDiff } from '../src/core/trim.js'
+import { summarize } from '../src/core/summarize.js'
+import { countDrift, trimDiff, trimDrift } from '../src/core/trim.js'
 
 const fixture = (name: string): string => join(import.meta.dirname, 'fixtures', name)
 
@@ -91,7 +91,7 @@ Plan: 0 to add, 1 to change, 0 to destroy.
         path: 'prod/failed',
         counts: null,
         actionsText: null,
-        drift: [],
+        driftText: null,
         status: 'failed'
       }
     ])
@@ -107,7 +107,7 @@ Plan: 0 to add, 1 to change, 0 to destroy.
         path: 'prod/api',
         counts: { add: 1, change: 0, destroy: 0, replace: 0 },
         actionsText: trimDiff(await readFile(fixture('plan-actions-sample.txt'), 'utf8')),
-        drift: [],
+        driftText: null,
         status: 'changes'
       }
     ])
@@ -232,13 +232,22 @@ omitted=<%= it.omittedCount %>
     expect(await loadStacksFromArtifactRoot(join(tmpdir(), 'tf-pr-commenter-missing-xyz'))).toEqual([])
   })
 
-  it('summarizes resource_drift, labelling replacements and dropping no-op refreshes', async () => {
-    const planJson = JSON.parse(await readFile(fixture('tfplan-drift-sample.json'), 'utf8'))
+  it('extracts only Terraform\'s rendered drift section, stopping before the plan actions', async () => {
+    const text = await readFile(fixture('plan-drift-sample.txt'), 'utf8')
+    const drift = trimDrift(text, 'terragrunt')
 
-    expect(summarizeDrift(planJson)).toEqual([
-      { address: 'module.security_group.aws_security_group.this[0]', action: 'update' },
-      { address: 'module.db.aws_db_instance.this[0]', action: 'replace' }
-    ])
+    // Terraform's own drift report is the schema-filtered view: one meaningful resource.
+    expect(countDrift(drift)).toBe(1)
+    expect(drift).toContain('# module.master.module.db_instance.aws_db_instance.this[0] has changed')
+    expect(drift).toContain('domain_dns_ips')
+    // The plan actions (deletion_protection) and the Plan: line are not drift.
+    expect(drift).not.toContain('deletion_protection')
+    expect(drift).not.toContain('Plan: 0 to add')
+  })
+
+  it('returns no drift when the plan has no "changed outside" section', () => {
+    expect(trimDrift('No changes. Your infrastructure matches the configuration.', 'terragrunt')).toBe('')
+    expect(countDrift(null)).toBe(0)
   })
 
   it('renders a drift badge and a "Changed outside Terraform" block', () => {
@@ -248,14 +257,14 @@ omitted=<%= it.omittedCount %>
         path: 'prod/api',
         counts: { add: 0, change: 1, destroy: 0, replace: 0 },
         actionsText: '!   resource "aws_db_instance" "this" {',
-        drift: [{ address: 'module.sg.aws_security_group.this[0]', action: 'update' }],
+        driftText: '# module.sg.aws_security_group.this[0] has changed\n! resource "aws_security_group" "this" {',
         status: 'changes'
       }
     ])
 
     expect(body).toContain('| `prod-api` | `+0 ~1 -0` | ✅ ⚠️ 1 drifted |')
     expect(body).toContain('**⚠️ Changed outside Terraform:**')
-    expect(body).toContain('! module.sg.aws_security_group.this[0] (update)')
+    expect(body).toContain('# module.sg.aws_security_group.this[0] has changed')
   })
 
   it('surfaces a drift-only stack that has no planned actions', () => {
@@ -265,7 +274,7 @@ omitted=<%= it.omittedCount %>
         path: 'prod/db',
         counts: { add: 0, change: 0, destroy: 0, replace: 0 },
         actionsText: null,
-        drift: [{ address: 'module.db.aws_db_instance.this[0]', action: 'replace' }],
+        driftText: '# module.db.aws_db_instance.this[0] has changed\n! resource "aws_db_instance" "this" {',
         status: 'changes'
       }
     ])
@@ -273,7 +282,7 @@ omitted=<%= it.omittedCount %>
     // +0 ~0 -0 with no diff, but the drift is still visible in the table and a detail block.
     expect(body).toContain('⚠️ 1 drifted')
     expect(body).toContain('<details>')
-    expect(body).toContain('! module.db.aws_db_instance.this[0] (replace)')
+    expect(body).toContain('# module.db.aws_db_instance.this[0] has changed')
   })
 })
 
@@ -287,7 +296,7 @@ function makeLargeStacks(count: number): StackPlan[] {
       ...Array.from({ length: 12 }, (__, line) => `+     attr_${line} = "${'x'.repeat(24)}"`),
       '+   }'
     ].join('\n'),
-    drift: [],
+    driftText: null,
     status: 'changes'
   }))
 }

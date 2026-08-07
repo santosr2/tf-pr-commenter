@@ -4,9 +4,9 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:pat
 import fg from 'fast-glob'
 
 import type { StackPlan } from './model.js'
-import { summarize, summarizeDrift } from './summarize.js'
+import { summarize } from './summarize.js'
 import type { Tool } from './trim.js'
-import { trimDiff } from './trim.js'
+import { trimDiff, trimDrift } from './trim.js'
 
 export interface StackFromFilesOptions {
   planFile: string
@@ -26,13 +26,13 @@ export async function stackFromFiles(
   const meta = await readMetadata(metaFile)
   const planJson = JSON.parse(await readFile(planFile, 'utf8')) as unknown
   const counts = summarize(planJson)
-  const drift = summarizeDrift(planJson)
   const planTextFile = options.planTextFile
     ? resolve(cwd, options.planTextFile)
     : null
-  const actionsText = planTextFile
-    ? trimDiff(await readFile(planTextFile, 'utf8'), options.tool ?? 'auto')
-    : ''
+  const tool = options.tool ?? 'auto'
+  const planText = planTextFile ? await readFile(planTextFile, 'utf8') : null
+  const actionsText = planText ? trimDiff(planText, tool) : ''
+  const driftText = planText ? trimDrift(planText, tool) : ''
   const stackPath = meta.path ?? inferPath(directory, cwd)
   const status = normalizeStatus(meta.status, counts.add + counts.change + counts.destroy)
 
@@ -41,7 +41,7 @@ export async function stackFromFiles(
     path: stackPath,
     counts,
     actionsText: actionsText || null,
-    drift,
+    driftText: driftText || null,
     status
   }
 }
@@ -58,10 +58,11 @@ export async function stackFromArtifact(
     ? (JSON.parse(await readFile(planFile, 'utf8')) as unknown)
     : null
   const counts = planJson === null ? null : summarize(planJson)
-  const drift = planJson === null ? [] : summarizeDrift(planJson)
-  const actionsText = (await fileExists(planTextFile))
-    ? trimDiff(await readFile(planTextFile, 'utf8'), tool)
-    : ''
+  const planText = (await fileExists(planTextFile))
+    ? await readFile(planTextFile, 'utf8')
+    : null
+  const actionsText = planText ? trimDiff(planText, tool) : ''
+  const driftText = planText ? trimDrift(planText, tool) : ''
   const stackPath = meta.path ?? basename(artifactDirectory)
   const total = counts ? counts.add + counts.change + counts.destroy : 0
   const status = normalizeStatus(meta.status, total)
@@ -71,7 +72,7 @@ export async function stackFromArtifact(
     path: stackPath,
     counts,
     actionsText: actionsText || null,
-    drift,
+    driftText: driftText || null,
     status
   }
 }
