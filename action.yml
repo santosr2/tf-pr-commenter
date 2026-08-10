@@ -31,6 +31,9 @@ inputs:
   tool:
     description: 'auto | terraform | terragrunt. Controls plan-text prefix stripping.'
     default: 'auto'
+  show-outputs:
+    description: 'Surface Terraform''s "Changes to Outputs" section as a "Δ N outputs" badge and an "Output changes" block. Off by default: output-only diffs are the lowest-signal channel and often just sensitive values.'
+    default: 'false'
 outputs:
   comment-id:
     description: 'The created or updated comment id.'

@@ -13,6 +13,20 @@ const DRIFT_END = [
   'Terraform used the selected providers',
   '─'
 ]
+// Terraform's "Changes to Outputs:" section. The body runs until any of these,
+// which cover the trailing "apply to save output values" note, the saved-plan
+// line, a warning box, or a horizontal rule.
+const OUTPUTS_HEADER = 'Changes to Outputs:'
+const OUTPUTS_END = [
+  'You can apply this plan',
+  'Saved the plan to',
+  'Releasing state lock',
+  'Warning:',
+  'Note:',
+  '─',
+  '╵',
+  '╷'
+]
 const MARKER_MAP: Record<string, string> = {
   '~': '!',
   '-/+': '!',
@@ -76,6 +90,41 @@ export function countDrift(driftText: string | null): number {
   }
 
   return (driftText.match(/^\s*# .* has changed$/gmu) ?? []).length
+}
+
+// Output changes are the lowest-signal channel (often just "(sensitive value)" and no
+// real infrastructure change), so they are opt-in. This extracts the "Changes to Outputs:"
+// section, mirroring trimDrift.
+export function trimOutputs(planText: string, tool: Tool = 'auto'): string {
+  const lines = normalizeToolLines(planText, tool)
+  const headerIndex = lines.findIndex((line) => line.includes(OUTPUTS_HEADER))
+
+  if (headerIndex === -1) {
+    return ''
+  }
+
+  const body: string[] = []
+  for (const line of lines.slice(headerIndex + 1)) {
+    if (OUTPUTS_END.some((marker) => line.includes(marker))) {
+      break
+    }
+
+    body.push(shiftChangeMarker(line))
+  }
+
+  return body.join('\n').replace(/^\n+|\n+$/gu, '')
+}
+
+// Count of changed top-level outputs. Terraform indents each with two spaces, so after
+// marker-shifting a top-level entry reads "<marker> <2-space indent><name>" — marker then
+// exactly three spaces then a non-space. Nested lines of a complex output sit deeper and
+// are excluded.
+export function countOutputs(outputsText: string | null): number {
+  if (!outputsText) {
+    return 0
+  }
+
+  return (outputsText.match(/^[+!-] {3}\S/gmu) ?? []).length
 }
 
 function normalizeToolLines(planText: string, tool: Tool): string[] {

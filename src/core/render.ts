@@ -13,13 +13,15 @@ import {
   compileTemplate,
   renderTemplate
 } from './template.js'
-import { countDrift } from './trim.js'
+import { countDrift, countOutputs } from './trim.js'
 
 export interface RenderOptions {
   budget?: number
   header?: string
   marker?: string
   template?: string
+  // Off by default: output-only diffs are the lowest-signal channel, so they are opt-in.
+  showOutputs?: boolean
 }
 
 const DEFAULT_BUDGET = 65000
@@ -30,12 +32,14 @@ export function render(stacks: StackPlan[], options: RenderOptions = {}): string
   const budget = options.budget ?? DEFAULT_BUDGET
   const marker = options.marker ?? DEFAULT_MARKER
   const templateParts = compileTemplate(options.template ?? DEFAULT_TEMPLATE)
-  const stackViews = stacks.map(toStackView)
-  // A drift-only stack (objects changed outside Terraform, no planned action) has no
-  // actionsText but still warrants a detail block, so include it as a candidate and
-  // weight the budget ordering by drift too.
+  // Output changes are opt-in; when off, drop the text so nothing renders it.
+  const stackViews = stacks
+    .map((stack) => (options.showOutputs ? stack : { ...stack, outputsText: null }))
+    .map(toStackView)
+  // A drift-only or outputs-only stack has no actionsText but still warrants a detail
+  // block, so include it as a candidate and weight the budget ordering by drift too.
   const candidates = [...stackViews]
-    .filter((stack) => stack.actionsText || stack.driftText)
+    .filter((stack) => stack.actionsText || stack.driftText || stack.outputsText)
     .sort((a, b) => b.total + b.driftCount - (a.total + a.driftCount))
 
   const included: StackPlanView[] = []
@@ -112,7 +116,8 @@ function toStackView(stack: StackPlan): StackPlanView {
     planCell: line ? `\`${line}\`` : '—',
     total: stack.counts ? countsTotal(stack.counts) : 0,
     statusIcon: STATUS_ICON[stack.status],
-    driftCount: countDrift(stack.driftText)
+    driftCount: countDrift(stack.driftText),
+    outputsCount: countOutputs(stack.outputsText)
   }
 }
 

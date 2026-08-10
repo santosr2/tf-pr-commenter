@@ -33,6 +33,7 @@ export async function run(): Promise<void> {
       budget: parseBudget(core.getInput('char-budget')),
       header: core.getInput('header') || '🏗️ Terraform Plan',
       marker,
+      showOutputs: core.getBooleanInput('show-outputs'),
       ...(template ? { template } : {})
     }
     let body = render(stacks, renderOptions)

@@ -1,5 +1,5 @@
 <!-- tf-pr-commenter:detail -->
-<details><summary>📋 <code><%= it.stack.name %></code><% if (it.stack.countsLine) { %> <code><%= it.stack.countsLine %></code><% } %><% if (it.stack.driftCount) { %> ⚠️ <%= it.stack.driftCount %> drifted<% } %></summary>
+<details><summary>📋 <code><%= it.stack.name %></code><% if (it.stack.countsLine) { %> <code><%= it.stack.countsLine %></code><% } %><% if (it.stack.driftCount) { %> ⚠️ <%= it.stack.driftCount %> drifted<% } %><% if (it.stack.outputsCount) { %> Δ <%= it.stack.outputsCount %> outputs<% } %></summary>
 
 <% if (it.stack.actionsText) { %>```diff
 <%~ it.stack.actionsText + '\n' %>
@@ -9,6 +9,12 @@
 
 ```diff
 <%~ it.stack.driftText + '\n' %>
+```
+
+<% } %><% if (it.stack.outputsText) { %>**Δ Output changes:**
+
+```diff
+<%~ it.stack.outputsText + '\n' %>
 ```
 
 <% } %></details>
@@ -27,7 +33,7 @@ Keep two blank lines after the H2 line below so one survives before the table.
 
 | Stack | Plan | Status |
 |---|---|---|
-<% it.stacks.forEach((stack) => { %>| `<%= stack.name %>` | <%~ stack.planCell %> | <%= stack.statusIcon %><% if (stack.driftCount) { %> ⚠️ <%= stack.driftCount %> drifted<% } %> |
+<% it.stacks.forEach((stack) => { %>| `<%= stack.name %>` | <%~ stack.planCell %> | <%= stack.statusIcon %><% if (stack.driftCount) { %> ⚠️ <%= stack.driftCount %> drifted<% } %><% if (stack.outputsCount) { %> Δ <%= stack.outputsCount %> outputs<% } %> |
 <% }) %><% if (it.detailSections.length) { %>
 
 <%~ it.detailSections.join('\n\n') %>

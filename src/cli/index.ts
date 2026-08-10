@@ -19,6 +19,7 @@ export async function main(argv: string[] = process.argv): Promise<number> {
     ...(args.budget ? { budget: args.budget } : {}),
     ...(args.header ? { header: args.header } : {}),
     ...(args.marker ? { marker: args.marker } : {}),
+    ...(args.showOutputs ? { showOutputs: true } : {}),
     ...(template ? { template } : {})
   }
   process.stdout.write(render(stacks, renderOptions))
@@ -40,6 +41,7 @@ interface CliArgs {
   marker?: string
   template?: string
   tool: Tool
+  showOutputs?: boolean
 }
 
 function parseArgs(args: string[]): CliArgs {
@@ -74,6 +76,8 @@ function parseArgs(args: string[]): CliArgs {
     } else if (arg === '--tool' && next) {
       parsed.tool = parseTool(next)
       index += 1
+    } else if (arg === '--show-outputs') {
+      parsed.showOutputs = true
     } else if (!arg?.startsWith('--')) {
       parsed.root = arg
     } else {

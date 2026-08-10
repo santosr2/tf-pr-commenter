@@ -6,7 +6,7 @@ import fg from 'fast-glob'
 import type { StackPlan } from './model.js'
 import { summarize } from './summarize.js'
 import type { Tool } from './trim.js'
-import { trimDiff, trimDrift } from './trim.js'
+import { trimDiff, trimDrift, trimOutputs } from './trim.js'
 
 export interface StackFromFilesOptions {
   planFile: string
@@ -33,6 +33,7 @@ export async function stackFromFiles(
   const planText = planTextFile ? await readFile(planTextFile, 'utf8') : null
   const actionsText = planText ? trimDiff(planText, tool) : ''
   const driftText = planText ? trimDrift(planText, tool) : ''
+  const outputsText = planText ? trimOutputs(planText, tool) : ''
   const stackPath = meta.path ?? inferPath(directory, cwd)
   const status = normalizeStatus(meta.status, counts.add + counts.change + counts.destroy)
 
@@ -42,6 +43,7 @@ export async function stackFromFiles(
     counts,
     actionsText: actionsText || null,
     driftText: driftText || null,
+    outputsText: outputsText || null,
     status
   }
 }
@@ -63,6 +65,7 @@ export async function stackFromArtifact(
     : null
   const actionsText = planText ? trimDiff(planText, tool) : ''
   const driftText = planText ? trimDrift(planText, tool) : ''
+  const outputsText = planText ? trimOutputs(planText, tool) : ''
   const stackPath = meta.path ?? basename(artifactDirectory)
   const total = counts ? counts.add + counts.change + counts.destroy : 0
   const status = normalizeStatus(meta.status, total)
@@ -73,6 +76,7 @@ export async function stackFromArtifact(
     counts,
     actionsText: actionsText || null,
     driftText: driftText || null,
+    outputsText: outputsText || null,
     status
   }
 }

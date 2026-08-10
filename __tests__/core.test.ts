@@ -12,7 +12,7 @@ import { DEFAULT_TEMPLATE } from '../src/core/default-template.generated.js'
 import { countsLine, type StackPlan } from '../src/core/model.js'
 import { render } from '../src/core/render.js'
 import { summarize } from '../src/core/summarize.js'
-import { countDrift, trimDiff, trimDrift } from '../src/core/trim.js'
+import { countDrift, countOutputs, trimDiff, trimDrift, trimOutputs } from '../src/core/trim.js'
 
 const fixture = (name: string): string => join(import.meta.dirname, 'fixtures', name)
 
@@ -92,6 +92,7 @@ Plan: 0 to add, 1 to change, 0 to destroy.
         counts: null,
         actionsText: null,
         driftText: null,
+        outputsText: null,
         status: 'failed'
       }
     ])
@@ -108,6 +109,7 @@ Plan: 0 to add, 1 to change, 0 to destroy.
         counts: { add: 1, change: 0, destroy: 0, replace: 0 },
         actionsText: trimDiff(await readFile(fixture('plan-actions-sample.txt'), 'utf8')),
         driftText: null,
+        outputsText: null,
         status: 'changes'
       }
     ])
@@ -258,6 +260,7 @@ omitted=<%= it.omittedCount %>
         counts: { add: 0, change: 1, destroy: 0, replace: 0 },
         actionsText: '!   resource "aws_db_instance" "this" {',
         driftText: '# module.sg.aws_security_group.this[0] has changed\n! resource "aws_security_group" "this" {',
+        outputsText: null,
         status: 'changes'
       }
     ])
@@ -275,6 +278,7 @@ omitted=<%= it.omittedCount %>
         counts: { add: 0, change: 0, destroy: 0, replace: 0 },
         actionsText: null,
         driftText: '# module.db.aws_db_instance.this[0] has changed\n! resource "aws_db_instance" "this" {',
+        outputsText: null,
         status: 'changes'
       }
     ])
@@ -283,6 +287,60 @@ omitted=<%= it.omittedCount %>
     expect(body).toContain('⚠️ 1 drifted')
     expect(body).toContain('<details>')
     expect(body).toContain('# module.db.aws_db_instance.this[0] has changed')
+  })
+
+  it('extracts the Changes to Outputs section and counts only top-level outputs', async () => {
+    const text = await readFile(fixture('plan-outputs-sample.txt'), 'utf8')
+    const outputs = trimOutputs(text, 'terragrunt')
+
+    // master, endpoint, config are top-level; the nested "added" key is not counted.
+    expect(countOutputs(outputs)).toBe(3)
+    expect(outputs).toContain('master')
+    expect(outputs).toContain('endpoint')
+    // Stops before the trailing "You can apply this plan…" note and the Plan: line.
+    expect(outputs).not.toContain('You can apply this plan')
+    expect(outputs).not.toContain('Plan: 0 to add')
+  })
+
+  it('hides output changes by default and shows them only when show-outputs is on', () => {
+    const stack: StackPlan = {
+      name: 'prod-api',
+      path: 'prod/api',
+      counts: { add: 0, change: 1, destroy: 0, replace: 0 },
+      actionsText: '!   resource "aws_db_instance" "this" {',
+      driftText: null,
+      outputsText: '!   master = (sensitive value)',
+      status: 'changes'
+    }
+
+    const off = render([stack])
+    expect(off).not.toContain('Δ')
+    expect(off).not.toContain('Output changes')
+
+    const on = render([stack], { showOutputs: true })
+    expect(on).toContain('Δ 1 outputs')
+    expect(on).toContain('**Δ Output changes:**')
+    expect(on).toContain('master')
+  })
+
+  it('surfaces an outputs-only stack when show-outputs is on', () => {
+    const on = render(
+      [
+        {
+          name: 'prod-outs',
+          path: 'prod/outs',
+          counts: { add: 0, change: 0, destroy: 0, replace: 0 },
+          actionsText: null,
+          driftText: null,
+          outputsText: '!   master = (sensitive value)',
+          status: 'changes'
+        }
+      ],
+      { showOutputs: true }
+    )
+
+    expect(on).toContain('Δ 1 outputs')
+    expect(on).toContain('<details>')
   })
 })
 
@@ -297,6 +355,7 @@ function makeLargeStacks(count: number): StackPlan[] {
       '+   }'
     ].join('\n'),
     driftText: null,
+    outputsText: null,
     status: 'changes'
   }))
 }
