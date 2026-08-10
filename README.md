@@ -114,6 +114,11 @@ schema-filtered view — so it excludes computed and `ignore_changes` churn) and
 "Changed outside Terraform" block. A stack can be drift-only: `+0 ~0 -0` with a badge and a drift block
 but no plan actions.
 
+Set `show-outputs: true` to also surface Terraform's "Changes to Outputs" section as a `Δ N outputs`
+badge and an "Output changes" block. It is off by default because output-only diffs are the
+lowest-signal channel — they often just read `(sensitive value)` and mean no real infrastructure
+changed.
+
 <details><summary>Raw Markdown the action posts</summary>
 
 ````markdown
@@ -174,6 +179,7 @@ but no plan actions.
 | `char-budget` | Maximum rendered comment chars. | `65000` |
 | `template` | Inline Eta template or path to a `.eta` template. | bundled default |
 | `tool` | `auto`, `terraform`, or `terragrunt`; controls plan text prefix stripping. | `auto` |
+| `show-outputs` | Surface the "Changes to Outputs" section as a `Δ N outputs` badge and an "Output changes" block. Off by default (lowest-signal channel). | `false` |
 
 ## Template Model
 
@@ -205,10 +211,11 @@ fit the budget.
 | `totals` | Summed `add`, `change`, `destroy`, and `replace` counts. |
 | `statusIcon` | Status to icon map for `changes`, `no-changes`, and `failed`. |
 
-Each stack has `name`, `path`, `counts`, `actionsText`, `driftText`, `status`, `countsLine`,
-`planCell`, `total`, `statusIcon`, and `driftCount`. `driftText` is Terraform's rendered
-"Objects have changed outside of Terraform" block (or null), and `driftCount` is the number of
-resources in it.
+Each stack has `name`, `path`, `counts`, `actionsText`, `driftText`, `outputsText`, `status`,
+`countsLine`, `planCell`, `total`, `statusIcon`, `driftCount`, and `outputsCount`. `driftText` is
+Terraform's rendered "Objects have changed outside of Terraform" block (or null) and `driftCount`
+the resources in it; `outputsText` is the "Changes to Outputs" block (or null, and always null unless
+`show-outputs` is on) and `outputsCount` the number of top-level outputs changed.
 
 See `templates/default.eta`, `examples/compact.eta`, and `examples/grouped-by-action.eta`.
 

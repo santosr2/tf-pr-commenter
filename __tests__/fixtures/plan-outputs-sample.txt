@@ -1,0 +1,9 @@
+00:00:49.043 STDOUT terraform: Plan: 0 to add, 1 to change, 0 to destroy.
+00:00:49.043 STDOUT terraform: Changes to Outputs:
+00:00:49.043 STDOUT terraform:   ~ master   = (sensitive value)
+00:00:49.043 STDOUT terraform:   + endpoint = "db.internal:5432"
+00:00:49.043 STDOUT terraform:   ~ config   = {
+00:00:49.043 STDOUT terraform:       + added = "x"
+00:00:49.043 STDOUT terraform:     }
+00:00:49.043 STDOUT terraform: You can apply this plan to save these new output values to the Terraform
+00:00:49.043 STDOUT terraform: state, without changing any real infrastructure.

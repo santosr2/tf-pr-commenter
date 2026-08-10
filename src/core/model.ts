@@ -14,6 +14,9 @@ export interface StackPlan {
   actionsText: string | null
   // Terraform's rendered "Objects have changed outside of Terraform" block, or null.
   driftText: string | null
+  // Terraform's rendered "Changes to Outputs:" block, or null. Only surfaced when the
+  // show-outputs option is on, since output-only diffs are the lowest-signal channel.
+  outputsText: string | null
   status: Status
 }
 
@@ -23,6 +26,7 @@ export interface StackPlanView extends StackPlan {
   total: number
   statusIcon: string
   driftCount: number
+  outputsCount: number
 }
 
 export interface RenderModel {
