@@ -22,6 +22,9 @@ export interface StackPlan {
 
 export interface StackPlanView extends StackPlan {
   countsLine: string | null
+  // The stack name as a table cell: a link to the job that planned it when one was
+  // resolved, plain code otherwise.
+  nameCell: string
   planCell: string
   total: number
   statusIcon: string
@@ -35,6 +38,11 @@ export interface RenderModel {
   stacks: StackPlanView[]
   details: StackPlanView[]
   omittedCount: number
+  // Stacks kept out of `stacks` because they had nothing to report. Zero when
+  // show-unchanged is on.
+  unchangedCount: number
+  // Every stack planned, including the ones hidden as unchanged.
+  totalCount: number
   totals: Counts
   statusIcon: Record<Status, string>
 }

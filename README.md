@@ -8,9 +8,10 @@ per-stack diffs while they fit under GitHub's comment limit. Detail is dropped w
 omission note, never blind-truncated mid-diff.
 
 > [!WARNING]
-> This is an early-stage project and has not been tested in real Terraform/Terragrunt pull-request
-> workflows yet. Review the rendered comment output carefully before relying on it for production
-> infrastructure changes.
+> This is an early-stage project. It runs against real Terraform/Terragrunt pull requests today, but
+> in only a handful of workflows, so it is not battle-tested across the range of Terraform versions,
+> repository layouts, and job naming conventions in the wild. Review the rendered comment output
+> before relying on it for production infrastructure changes.
 
 ## Usage
 
@@ -23,6 +24,7 @@ on:
 permissions:
   contents: read
   pull-requests: write
+  actions: read # optional; enables the failed-jobs banner and per-stack job links
 
 jobs:
   comment:
@@ -54,7 +56,6 @@ diff exactly as it appears in the posted comment — `+` green (add), `-` red (d
 |---|---|---|
 | `envs/prod/networking` | `+2 ~1 -2` | ✅ |
 | `envs/prod/app` | `+0 ~1 -0` | ✅ ⚠️ 1 drifted |
-| `envs/staging/logging` | — | ⚪ |
 
 <details><summary>📋 <code>envs/prod/networking</code> <code>+2 ~1 -2</code></summary>
 
@@ -100,19 +101,37 @@ diff exactly as it appears in the posted comment — `+` green (add), `-` red (d
 
 </details>
 
+> ⚪ 1 stack unchanged — no planned changes and no drift.
+
 ---
 
 The colors come from GitHub's diff highlighter, not from the action. Terraform's `~` (in-place update)
 and `-/+` (replace) markers are rewritten to `!` and moved to column 0 so the highlighter renders them
-as changed lines. Stacks with no changes show `—` and a ⚪ status, and their detail block is skipped
-entirely. When detail blocks would exceed `char-budget`, whole stacks are dropped with an explicit
-omission note while the summary table above stays complete.
+as changed lines. When detail blocks would exceed `char-budget`, whole stacks are dropped with an
+explicit omission note while the summary table above stays complete.
+
+Stacks with no planned changes and no drift are left out of the table and reported as a single
+`⚪ N stacks unchanged` footer. A row that reads `+0 ~0 -0 ⚪` costs ~60 characters and says nothing,
+and the table competes with plan detail for `char-budget` — on a 59-stack repo that is ~2.4 KB
+reclaimed for diffs worth reading. Set `show-unchanged: true` to keep a row for every stack.
 
 A `⚠️ N drifted` badge marks stacks where Terraform detected objects changed **outside** Terraform.
 The drift is taken from Terraform's own "Objects have changed outside of Terraform" report (its
 schema-filtered view — so it excludes computed and `ignore_changes` churn) and rendered in a separate
 "Changed outside Terraform" block. A stack can be drift-only: `+0 ~0 -0` with a badge and a drift block
 but no plan actions.
+
+Set `job-link-pattern` to turn each stack name into a link to the job that planned it. Matrix job
+names embed the stack path, so the action matches every stack against this run's jobs and links the
+one whose name matches the pattern. `plan` is the useful value for a Terragrunt matrix: it selects the
+plan job while skipping a policy or apply job for the same stack. GitHub truncates the matrix portion
+of a long job name, but a reusable workflow's child suffix (`… / plan - envs/prod/app`) keeps the full
+path, so matching survives it. Stacks with no matching job render plain, as does every stack when the
+token lacks `actions: read`.
+
+It is empty by default because links are not free: a job URL is ~85 characters, so budget roughly 90
+characters per linked row — on a 22-row table that is ~2 KB of `char-budget` not spent on plan detail.
+Turn it on when navigating to the job matters more than one extra diff.
 
 Set `show-outputs: true` to also surface Terraform's "Changes to Outputs" section as a `Δ N outputs`
 badge and an "Output changes" block. It is off by default because output-only diffs are the
@@ -130,7 +149,6 @@ changed.
 |---|---|---|
 | `envs/prod/networking` | `+2 ~1 -2` | ✅ |
 | `envs/prod/app` | `+0 ~1 -0` | ✅ ⚠️ 1 drifted |
-| `envs/staging/logging` | — | ⚪ |
 
 <details><summary>📋 <code>envs/prod/networking</code> <code>+2 ~1 -2</code></summary>
 
@@ -163,6 +181,8 @@ changed.
 ```
 
 </details>
+
+> ⚪ 1 stack unchanged — no planned changes and no drift.
 ````
 
 </details>
@@ -180,6 +200,8 @@ changed.
 | `template` | Inline Eta template or path to a `.eta` template. | bundled default |
 | `tool` | `auto`, `terraform`, or `terragrunt`; controls plan text prefix stripping. | `auto` |
 | `show-outputs` | Surface the "Changes to Outputs" section as a `Δ N outputs` badge and an "Output changes" block. Off by default (lowest-signal channel). | `false` |
+| `show-unchanged` | Keep a table row for every stack with no planned changes and no drift. Off by default; the count is reported in a footer either way. | `false` |
+| `job-link-pattern` | Case-insensitive regex matched against this run's job names. A stack whose path appears in a matching job's name links to that job. Empty (the default) renders plain names. | |
 
 ## Template Model
 
@@ -204,15 +226,19 @@ fit the budget.
 |---|---|
 | `header` | Comment title. |
 | `marker` | Hidden upsert marker. |
-| `stacks` | Every stack, always complete for summary tables. |
+| `stacks` | Stacks worth a summary row: everything except those hidden as unchanged. |
 | `details` | Stack subset whose detail blocks fit the budget. |
 | `detailSections` | Rendered detail Markdown for `details`. |
 | `omittedCount` | Number of stack detail blocks dropped to fit the budget. |
+| `unchangedCount` | Number of stacks hidden from `stacks` as unchanged. Always `0` when `show-unchanged` is on. |
+| `totalCount` | Every stack planned, including the ones hidden as unchanged. |
 | `totals` | Summed `add`, `change`, `destroy`, and `replace` counts. |
 | `statusIcon` | Status to icon map for `changes`, `no-changes`, and `failed`. |
 
 Each stack has `name`, `path`, `counts`, `actionsText`, `driftText`, `outputsText`, `status`,
-`countsLine`, `planCell`, `total`, `statusIcon`, `driftCount`, and `outputsCount`. `driftText` is
+`countsLine`, `nameCell`, `planCell`, `total`, `statusIcon`, `driftCount`, and `outputsCount`.
+`nameCell` is the name already rendered as a table cell — a Markdown link to the job that planned the
+stack when one was resolved, plain code otherwise. `driftText` is
 Terraform's rendered "Objects have changed outside of Terraform" block (or null) and `driftCount`
 the resources in it; `outputsText` is the "Changes to Outputs" block (or null, and always null unless
 `show-outputs` is on) and `outputsCount` the number of top-level outputs changed.

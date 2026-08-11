@@ -34,6 +34,12 @@ inputs:
   show-outputs:
     description: 'Surface Terraform''s "Changes to Outputs" section as a "Δ N outputs" badge and an "Output changes" block. Off by default: output-only diffs are the lowest-signal channel and often just sensitive values.'
     default: 'false'
+  job-link-pattern:
+    description: 'Case-insensitive regex matched against this run''s job names; a stack path found in a matching job name links that stack to the job. Empty by default: a job URL costs ~85 chars, so linking every row spends character budget that plan detail could use. Set to "plan" to link a matrix plan job while skipping a policy or apply job for the same stack. Needs actions: read; silently plain if not granted.'
+    default: ''
+  show-unchanged:
+    description: 'Keep a table row for every stack with no planned changes and no drift. Off by default: those rows carry no signal and spend character budget that plan detail could use. The count is reported in a footer either way.'
+    default: 'false'
 outputs:
   comment-id:
     description: 'The created or updated comment id.'
