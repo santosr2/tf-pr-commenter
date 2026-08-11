@@ -8,9 +8,10 @@ per-stack diffs while they fit under GitHub's comment limit. Detail is dropped w
 omission note, never blind-truncated mid-diff.
 
 > [!WARNING]
-> This is an early-stage project and has not been tested in real Terraform/Terragrunt pull-request
-> workflows yet. Review the rendered comment output carefully before relying on it for production
-> infrastructure changes.
+> This is an early-stage project. It runs against real Terraform/Terragrunt pull requests today, but
+> in only a handful of workflows, so it is not battle-tested across the range of Terraform versions,
+> repository layouts, and job naming conventions in the wild. Review the rendered comment output
+> before relying on it for production infrastructure changes.
 
 ## Usage
 
