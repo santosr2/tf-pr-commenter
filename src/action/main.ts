@@ -13,7 +13,12 @@ import type { StackPlan } from '../core/model.js'
 import { render } from '../core/render.js'
 import type { Tool } from '../core/trim.js'
 import { upsertComment } from '../github/comment.js'
-import { failedJobsBanner, failedOrCancelledJobs } from '../github/jobs.js'
+import {
+  failedJobsBanner,
+  failedOrCancelledNames,
+  jobUrlsByStack,
+  listRunJobs
+} from '../github/jobs.js'
 
 export async function run(): Promise<void> {
   try {
@@ -29,14 +34,6 @@ export async function run(): Promise<void> {
       : await loadStacksFromPlanFiles(cwd, tool)
     const template = await readTemplateInput(core.getInput('template'), cwd)
     const marker = core.getInput('marker') || '<!-- tf-pr-commenter -->'
-    const renderOptions = {
-      budget: parseBudget(core.getInput('char-budget')),
-      header: core.getInput('header') || '🏗️ Terraform Plan',
-      marker,
-      showOutputs: core.getBooleanInput('show-outputs'),
-      ...(template ? { template } : {})
-    }
-    let body = render(stacks, renderOptions)
     const pullRequestNumber = github.context.payload.pull_request?.number
     if (!pullRequestNumber) {
       throw new Error('tf-pr-commenter must run in a pull_request context')
@@ -45,18 +42,44 @@ export async function run(): Promise<void> {
     const token = core.getInput('github-token', { required: true })
     const octokit = github.getOctokit(token)
 
+    // Both the failed-jobs banner and the per-stack job links read this run's jobs, so
+    // fetch them once. Needs `actions: read`; listRunJobs degrades to [] without it.
+    const warnOnFailedJobs = core.getBooleanInput('warn-on-failed-jobs')
+    const jobLinkPattern = parseJobLinkPattern(core.getInput('job-link-pattern'))
+    const jobs =
+      warnOnFailedJobs || jobLinkPattern
+        ? await listRunJobs({
+            octokit,
+            owner: github.context.repo.owner,
+            repo: github.context.repo.repo,
+            runId: github.context.runId
+          })
+        : []
+
+    const renderOptions = {
+      budget: parseBudget(core.getInput('char-budget')),
+      header: core.getInput('header') || '🏗️ Terraform Plan',
+      marker,
+      showOutputs: core.getBooleanInput('show-outputs'),
+      showUnchanged: core.getBooleanInput('show-unchanged'),
+      ...(jobLinkPattern
+        ? {
+            jobUrls: jobUrlsByStack(
+              jobs,
+              stacks.map((stack) => stack.path),
+              jobLinkPattern
+            )
+          }
+        : {}),
+      ...(template ? { template } : {})
+    }
+    let body = render(stacks, renderOptions)
+
     // A comment rendered from artifacts alone can't tell "no changes" apart from "a job
-    // failed/cancelled and emitted nothing". Query this run's job conclusions and, if any
-    // failed or were cancelled, prepend a banner so the comment never reads as success while
-    // a job actually failed. Needs `actions: read`; failedOrCancelledJobs degrades to [].
-    if (core.getBooleanInput('warn-on-failed-jobs')) {
-      const failed = await failedOrCancelledJobs({
-        octokit,
-        owner: github.context.repo.owner,
-        repo: github.context.repo.repo,
-        runId: github.context.runId
-      })
-      const banner = failedJobsBanner(failed)
+    // failed/cancelled and emitted nothing". If any job failed or was cancelled, prepend a
+    // banner so the comment never reads as success while a job actually failed.
+    if (warnOnFailedJobs) {
+      const banner = failedJobsBanner(failedOrCancelledNames(jobs))
       if (banner) {
         body = insertAfterMarker(body, marker, banner)
       }
@@ -126,6 +149,20 @@ function insertAfterMarker(
   }
 
   return `${marker}\n\n${insertion}${body.slice(marker.length)}`
+}
+
+// Empty input turns per-stack job links off. An invalid pattern is a config error worth
+// failing on rather than silently rendering an unlinked table.
+function parseJobLinkPattern(input: string): RegExp | null {
+  if (!input.trim()) {
+    return null
+  }
+
+  try {
+    return new RegExp(input, 'iu')
+  } catch {
+    throw new Error(`invalid job-link-pattern: ${input}`)
+  }
 }
 
 function parseTool(input: string): Tool {

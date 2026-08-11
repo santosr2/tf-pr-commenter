@@ -342,7 +342,103 @@ omitted=<%= it.omittedCount %>
     expect(on).toContain('Δ 1 outputs')
     expect(on).toContain('<details>')
   })
+
+  it('drops unchanged stacks from the table and reports the count instead', () => {
+    const stacks: StackPlan[] = [
+      unchangedStack('quiet-a'),
+      unchangedStack('quiet-b'),
+      {
+        name: 'noisy',
+        path: 'prod/noisy',
+        counts: { add: 1, change: 0, destroy: 0, replace: 0 },
+        actionsText: '+   resource "aws_s3_bucket" "b" {',
+        driftText: null,
+        outputsText: null,
+        status: 'changes'
+      }
+    ]
+
+    const body = render(stacks)
+    expect(body).not.toContain('quiet-a')
+    expect(body).not.toContain('quiet-b')
+    expect(body).toContain('| `noisy` |')
+    expect(body).toContain('⚪ 2 stacks unchanged')
+    // The header still counts every stack planned, not just the visible rows.
+    expect(body).toContain('— 3 stacks')
+  })
+
+  it('keeps unchanged stacks when show-unchanged is on', () => {
+    const body = render([unchangedStack('quiet-a')], { showUnchanged: true })
+
+    expect(body).toContain('| `quiet-a` |')
+    expect(body).toContain('⚪')
+    expect(body).not.toContain('unchanged —')
+  })
+
+  it('keeps a clean stack visible when it has drift, and when it failed', () => {
+    const drifted: StackPlan = {
+      ...unchangedStack('drifted'),
+      driftText: '  # aws_db_instance.app has changed'
+    }
+    const failed: StackPlan = { ...unchangedStack('broken'), status: 'failed' }
+
+    const body = render([drifted, failed])
+    expect(body).toContain('| `drifted` |')
+    expect(body).toContain('| `broken` |')
+    expect(body).not.toContain('unchanged —')
+  })
+
+  it('renders the no-changes message when every stack is unchanged', () => {
+    const body = render([unchangedStack('a'), unchangedStack('b')])
+
+    expect(body).toContain('✅ No stacks with changes to plan.')
+    expect(body).toContain('⚪ 2 stacks unchanged')
+    expect(body).not.toContain('| Stack | Plan | Status |')
+  })
+
+  it('hides an outputs-only stack as unchanged while show-outputs is off', () => {
+    const outputsOnly: StackPlan = {
+      ...unchangedStack('outs'),
+      outputsText: '!   master = (sensitive value)'
+    }
+
+    expect(render([outputsOnly])).toContain('⚪ 1 stack unchanged')
+    expect(render([outputsOnly], { showOutputs: true })).toContain('| `outs` |')
+  })
+
+  it('links a stack name to its job and leaves unmatched stacks plain', () => {
+    const linked: StackPlan = {
+      name: 'prod/api',
+      path: 'prod/api',
+      counts: { add: 1, change: 0, destroy: 0, replace: 0 },
+      actionsText: '+   resource "aws_s3_bucket" "b" {',
+      driftText: null,
+      outputsText: null,
+      status: 'changes'
+    }
+    const plain: StackPlan = { ...linked, name: 'prod/web', path: 'prod/web' }
+    const url = 'https://github.com/acme/infra/actions/runs/1/job/2'
+
+    const body = render([linked, plain], {
+      jobUrls: new Map([['prod/api', url]])
+    })
+
+    expect(body).toContain(`| [\`prod/api\`](${url}) |`)
+    expect(body).toContain('| `prod/web` |')
+  })
 })
+
+function unchangedStack(name: string): StackPlan {
+  return {
+    name,
+    path: name,
+    counts: { add: 0, change: 0, destroy: 0, replace: 0 },
+    actionsText: null,
+    driftText: null,
+    outputsText: null,
+    status: 'no-changes'
+  }
+}
 
 function makeLargeStacks(count: number): StackPlan[] {
   return Array.from({ length: count }, (_, index) => ({

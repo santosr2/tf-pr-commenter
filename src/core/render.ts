@@ -22,6 +22,12 @@ export interface RenderOptions {
   template?: string
   // Off by default: output-only diffs are the lowest-signal channel, so they are opt-in.
   showOutputs?: boolean
+  // Off by default: a clean stack with no drift is a row that says nothing, and the table
+  // competes with plan detail for the character budget. The count is still reported.
+  showUnchanged?: boolean
+  // Stack path to the URL of the job that planned it. Stacks absent from the map render
+  // their name as plain code.
+  jobUrls?: ReadonlyMap<string, string>
 }
 
 const DEFAULT_BUDGET = 65000
@@ -33,9 +39,12 @@ export function render(stacks: StackPlan[], options: RenderOptions = {}): string
   const marker = options.marker ?? DEFAULT_MARKER
   const templateParts = compileTemplate(options.template ?? DEFAULT_TEMPLATE)
   // Output changes are opt-in; when off, drop the text so nothing renders it.
-  const stackViews = stacks
+  const allStacks = stacks
     .map((stack) => (options.showOutputs ? stack : { ...stack, outputsText: null }))
-    .map(toStackView)
+    .map((stack) => toStackView(stack, options.jobUrls?.get(stack.path)))
+  const stackViews = options.showUnchanged
+    ? allStacks
+    : allStacks.filter(hasSignal)
   // A drift-only or outputs-only stack has no actionsText but still warrants a detail
   // block, so include it as a candidate and weight the budget ordering by drift too.
   const candidates = [...stackViews]
@@ -45,20 +54,25 @@ export function render(stacks: StackPlan[], options: RenderOptions = {}): string
   const included: StackPlanView[] = []
   const detailSections: string[] = []
   const limit = Math.floor(budget * 0.9)
+  const model = {
+    header: options.header ?? DEFAULT_HEADER,
+    marker,
+    stacks: stackViews,
+    unchangedCount: allStacks.length - stackViews.length,
+    totalCount: allStacks.length,
+    // Totals cover every stack planned, including any hidden as unchanged.
+    totals: sumCounts(allStacks),
+    statusIcon: STATUS_ICON
+  }
 
   for (const candidate of candidates) {
     const candidateSection = renderDetailSection(templateParts.detail, candidate)
     const candidateIncluded = [...included, candidate]
     const candidateSections = [...detailSections, candidateSection]
-    const omittedCount = candidates.length - candidateIncluded.length
     const candidateBody = renderFullBody(marker, templateParts.shell, {
-      header: options.header ?? DEFAULT_HEADER,
-      marker,
-      stacks: stackViews,
+      ...model,
       details: candidateIncluded,
-      omittedCount,
-      totals: sumCounts(stackViews),
-      statusIcon: STATUS_ICON
+      omittedCount: candidates.length - candidateIncluded.length
     }, candidateSections)
 
     if (candidateBody.length <= limit) {
@@ -67,20 +81,23 @@ export function render(stacks: StackPlan[], options: RenderOptions = {}): string
     }
   }
 
-  const omittedCount = candidates.length - included.length
   return renderFullBody(
     marker,
     templateParts.shell,
     {
-      header: options.header ?? DEFAULT_HEADER,
-      marker,
-      stacks: stackViews,
+      ...model,
       details: included,
-      omittedCount,
-      totals: sumCounts(stackViews),
-      statusIcon: STATUS_ICON
+      omittedCount: candidates.length - included.length
     },
     detailSections
+  )
+}
+
+// A stack whose plan is clean and that reports no drift (nor outputs, when those are shown)
+// contributes only a table row saying nothing. Hide it and report the count instead.
+function hasSignal(stack: StackPlanView): boolean {
+  return (
+    stack.status !== 'no-changes' || stack.driftCount > 0 || stack.outputsCount > 0
   )
 }
 
@@ -108,11 +125,12 @@ function renderDetailSection(
   }).trim()
 }
 
-function toStackView(stack: StackPlan): StackPlanView {
+function toStackView(stack: StackPlan, jobUrl?: string): StackPlanView {
   const line = stack.counts ? countsLine(stack.counts) : null
   return {
     ...stack,
     countsLine: line,
+    nameCell: jobUrl ? `[\`${stack.name}\`](${jobUrl})` : `\`${stack.name}\``,
     planCell: line ? `\`${line}\`` : '—',
     total: stack.counts ? countsTotal(stack.counts) : 0,
     statusIcon: STATUS_ICON[stack.status],
