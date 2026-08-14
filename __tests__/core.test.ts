@@ -388,12 +388,18 @@ omitted=<%= it.omittedCount %>
     expect(body).not.toContain('unchanged —')
   })
 
-  it('renders the no-changes message when every stack is unchanged', () => {
+  it('renders one no-changes message when every stack is unchanged', () => {
     const body = render([unchangedStack('a'), unchangedStack('b')])
 
-    expect(body).toContain('✅ No stacks with changes to plan.')
-    expect(body).toContain('⚪ 2 stacks unchanged')
+    expect(body).toContain('✅ 2 stacks planned — no changes and no drift.')
+    // The unchanged footer annotates the table; with no table it only restates the line above.
+    expect(body).not.toContain('unchanged —')
     expect(body).not.toContain('| Stack | Plan | Status |')
+  })
+
+  it('distinguishes a clean run from a run that planned nothing', () => {
+    expect(render([])).toContain('✅ No stacks to plan.')
+    expect(render([unchangedStack('a')])).toContain('✅ 1 stack planned')
   })
 
   it('hides an outputs-only stack as unchanged while show-outputs is off', () => {
@@ -402,7 +408,7 @@ omitted=<%= it.omittedCount %>
       outputsText: '!   master = (sensitive value)'
     }
 
-    expect(render([outputsOnly])).toContain('⚪ 1 stack unchanged')
+    expect(render([outputsOnly])).not.toContain('| `outs` |')
     expect(render([outputsOnly], { showOutputs: true })).toContain('| `outs` |')
   })
 
