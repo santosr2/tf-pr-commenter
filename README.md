@@ -115,6 +115,10 @@ Stacks with no planned changes and no drift are left out of the table and report
 and the table competes with plan detail for `char-budget` — on a 59-stack repo that is ~2.4 KB
 reclaimed for diffs worth reading. Set `show-unchanged: true` to keep a row for every stack.
 
+When *every* stack is unchanged there is no table to annotate, so the comment collapses to a single
+`✅ N stacks planned — no changes and no drift.` line. The count is kept so a clean run is
+distinguishable from one where no plan files were found, which reads `✅ No stacks to plan.`
+
 A `⚠️ N drifted` badge marks stacks where Terraform detected objects changed **outside** Terraform.
 The drift is taken from Terraform's own "Objects have changed outside of Terraform" report (its
 schema-filtered view — so it excludes computed and `ignore_changes` churn) and rendered in a separate
