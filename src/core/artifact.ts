@@ -3,7 +3,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:pat
 
 import fg from 'fast-glob'
 
-import type { StackPlan } from './model.js'
+import { type Counts, type StackPlan, zeroCounts } from './model.js'
 import { summarize } from './summarize.js'
 import type { Tool } from './trim.js'
 import { trimDiff, trimDrift, trimOutputs } from './trim.js'
@@ -54,12 +54,9 @@ export async function stackFromArtifact(
 ): Promise<StackPlan> {
   const artifactDirectory = resolve(directory)
   const meta = await readMetadata(join(artifactDirectory, 'plan-meta.json'))
-  const planFile = join(artifactDirectory, 'tfplan.json')
   const planTextFile = join(artifactDirectory, 'plan-clean.txt')
-  const planJson = (await fileExists(planFile))
-    ? (JSON.parse(await readFile(planFile, 'utf8')) as unknown)
-    : null
-  const counts = planJson === null ? null : summarize(planJson)
+  const planFiles = await findPlanFiles(artifactDirectory)
+  const counts = planFiles.length === 0 ? null : await sumPlanCounts(planFiles)
   const planText = (await fileExists(planTextFile))
     ? await readFile(planTextFile, 'utf8')
     : null
@@ -113,6 +110,37 @@ export async function loadStacksFromArtifactRoot(
   return Promise.all(
     directories.map((directory) => stackFromArtifact(directory, tool))
   )
+}
+
+// An individual stack uploads one tfplan.json at the artifact root. An account-level
+// `terragrunt run --all` has no single plan, so it uploads one per unit in a nested tree.
+// Globbing serves both, and the sum is the account's real change count instead of an
+// em-dash that reads as "nothing to see".
+async function findPlanFiles(directory: string): Promise<string[]> {
+  // dot: true — a unit produced by `stack generate` lives under /.terragrunt-stack/, and
+  // fast-glob skips dot-directories by default, which would drop it from the total.
+  const matches = await fg('**/tfplan.json', {
+    cwd: directory,
+    absolute: true,
+    onlyFiles: true,
+    dot: true
+  })
+
+  return matches.sort()
+}
+
+async function sumPlanCounts(files: string[]): Promise<Counts> {
+  const totals = zeroCounts()
+
+  for (const file of files) {
+    const counts = summarize(JSON.parse(await readFile(file, 'utf8')) as unknown)
+    totals.add += counts.add
+    totals.change += counts.change
+    totals.destroy += counts.destroy
+    totals.replace += counts.replace
+  }
+
+  return totals
 }
 
 async function isArtifactDir(directory: string): Promise<boolean> {
