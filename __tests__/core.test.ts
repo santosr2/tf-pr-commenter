@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -230,6 +230,29 @@ omitted=<%= it.omittedCount %>
     expect(stacks[0]?.counts).toEqual({ add: 2, change: 1, destroy: 2, replace: 1 })
   })
 
+  it('sums per-unit plan JSON so a run --all account reports real counts', async () => {
+    // An account-level run --all has no single plan file, so the workflow uploads one
+    // tfplan.json per unit. One of them sits under a dot-directory, as generated stack
+    // units do.
+    const root = await mkdtemp(join(tmpdir(), 'tf-pr-commenter-'))
+    const plan = await readFile(fixture('tfplan-sample.json'), 'utf8')
+    await writeFile(
+      join(root, 'plan-meta.json'),
+      JSON.stringify({ path: 'shared/us-east-2/workera (run-all)', status: 'changes' })
+    )
+    for (const unit of ['unit-plans/common/k8s', 'unit-plans/internal/rundeck/.terragrunt-stack/irsa']) {
+      await mkdir(join(root, unit), { recursive: true })
+      await writeFile(join(root, unit, 'tfplan.json'), plan)
+    }
+
+    const stacks = await loadStacksFromArtifactRoot(root)
+
+    expect(stacks).toHaveLength(1)
+    expect(stacks[0]?.path).toBe('shared/us-east-2/workera (run-all)')
+    // Both units counted, including the one under .terragrunt-stack: twice the fixture.
+    expect(stacks[0]?.counts).toEqual({ add: 4, change: 2, destroy: 4, replace: 2 })
+  })
+
   it('returns no stacks when the artifact root does not exist', async () => {
     expect(await loadStacksFromArtifactRoot(join(tmpdir(), 'tf-pr-commenter-missing-xyz'))).toEqual([])
   })
@@ -245,6 +268,46 @@ omitted=<%= it.omittedCount %>
     // The plan actions (deletion_protection) and the Plan: line are not drift.
     expect(drift).not.toContain('deletion_protection')
     expect(drift).not.toContain('Plan: 0 to add')
+  })
+
+  it('keeps every unit of a run --all plan, labelled by unit', async () => {
+    const text = await readFile(fixture('plan-run-all-sample.txt'), 'utf8')
+
+    const diff = trimDiff(text, 'terragrunt')
+
+    // Both units survive: taking only the first section would drop internal/runner.
+    expect(diff).toContain('# common/database')
+    expect(diff).toContain('# internal/runner')
+    expect(diff).toMatch(/^! +resource "aws_db_instance" "this" \{/m)
+    expect(diff).toMatch(/^\+ +resource "aws_iam_role" "runner_xl" \{/m)
+    expect(diff).toMatch(/^- +resource "aws_iam_role" "runner_old" \{/m)
+    // The unit label is stripped along with the timestamp prefix.
+    expect(diff).not.toContain('STDOUT')
+    expect(diff).not.toContain('[common/database]')
+    expect(diff).not.toContain('Plan: 0 to add')
+  })
+
+  it('does not let a sibling unit leak into or truncate another unit\'s section', async () => {
+    const text = await readFile(fixture('plan-run-all-sample.txt'), 'utf8')
+
+    const diff = trimDiff(text, 'terragrunt')
+
+    // internal/runner refreshes state in the middle of common/database's block. It
+    // belongs to neither section body, and must not cut the database section short.
+    expect(diff).not.toContain('Refreshing state')
+    expect(diff).toMatch(/^! +deletion_protection = false -> true/m)
+  })
+
+  it('reads drift from run --all output, which the unit label would otherwise hide', async () => {
+    const text = await readFile(fixture('plan-run-all-sample.txt'), 'utf8')
+
+    const drift = trimDrift(text, 'terragrunt')
+
+    expect(countDrift(drift)).toBe(1)
+    expect(drift).toContain('# module.db.aws_db_instance.this[0] has changed')
+    expect(drift).toContain('domain_dns_ips')
+    // Drift stops before the planned actions, same as single-stack output.
+    expect(drift).not.toContain('deletion_protection')
   })
 
   it('returns no drift when the plan has no "changed outside" section', () => {

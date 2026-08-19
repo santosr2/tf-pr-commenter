@@ -1,0 +1,30 @@
+18:23:40.101 STDOUT [common/database] terraform: Initializing the backend...
+18:23:41.202 STDOUT [common/database] terraform: module.db.aws_db_instance.this[0]: Refreshing state... [id=db-XYZ]
+18:23:42.303 STDOUT [common/database] terraform: Note: Objects have changed outside of Terraform
+18:23:42.304 STDOUT [common/database] terraform:
+18:23:42.305 STDOUT [common/database] terraform: Terraform detected the following changes made outside of Terraform since the
+18:23:42.306 STDOUT [common/database] terraform: last "terraform apply" which may have affected this plan:
+18:23:42.307 STDOUT [common/database] terraform:   # module.db.aws_db_instance.this[0] has changed
+18:23:42.308 STDOUT [common/database] terraform:   ~ resource "aws_db_instance" "this" {
+18:23:42.309 STDOUT [common/database] terraform:       + domain_dns_ips = []
+18:23:42.310 STDOUT [common/database] terraform:         id             = "db-XYZ"
+18:23:42.311 STDOUT [common/database] terraform:     }
+18:23:42.312 STDOUT [common/database] terraform: Unless you have made equivalent changes to your configuration, or ignored the
+18:23:42.313 STDOUT [common/database] terraform: relevant attributes using ignore_changes, the following plan may include
+18:23:42.314 STDOUT [common/database] terraform: actions to undo or respond to these changes.
+18:23:43.404 STDOUT [common/database] terraform: Terraform will perform the following actions:
+18:23:43.405 STDOUT [common/database] terraform:
+18:23:43.406 STDOUT [common/database] terraform:   ~ resource "aws_db_instance" "this" {
+18:23:43.407 STDOUT [internal/runner] terraform: aws_iam_role.runner: Refreshing state... [id=runner]
+18:23:43.408 STDOUT [common/database] terraform:       ~ deletion_protection = false -> true
+18:23:43.409 STDOUT [common/database] terraform:     }
+18:23:43.410 STDOUT [common/database] terraform: Plan: 0 to add, 1 to change, 0 to destroy.
+18:24:10.511 STDOUT [internal/runner] terraform: Terraform will perform the following actions:
+18:24:10.512 STDOUT [internal/runner] terraform:
+18:24:10.513 STDOUT [internal/runner] terraform:   + resource "aws_iam_role" "runner_xl" {
+18:24:10.514 STDOUT [internal/runner] terraform:       + name = "runner-xl"
+18:24:10.515 STDOUT [internal/runner] terraform:     }
+18:24:10.516 STDOUT [internal/runner] terraform:   - resource "aws_iam_role" "runner_old" {
+18:24:10.517 STDOUT [internal/runner] terraform:       - name = "runner-old"
+18:24:10.518 STDOUT [internal/runner] terraform:     }
+18:24:10.519 STDOUT [internal/runner] terraform: Plan: 1 to add, 0 to change, 1 to destroy.
