@@ -15,7 +15,7 @@ jobs:
     if: github.actor == 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           # pull_request checks out a detached merge ref, which cannot be pushed.
           ref: ${{ github.head_ref }}
