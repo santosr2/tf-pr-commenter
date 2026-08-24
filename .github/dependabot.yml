@@ -1,0 +1,37 @@
+version: 2
+
+updates:
+  # Production deps are bundled into the committed dist/, which CI verifies with
+  # `git diff --exit-code -- dist`. Dependabot never runs the build, so a merged
+  # bump here needs `mise run package` first. Grouping minor+patch keeps that to
+  # one rebuild instead of one per dependency; majors still arrive alone.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      runtime-deps:
+        dependency-type: production
+        update-types: [minor, patch]
+      dev-deps:
+        dependency-type: development
+        update-types: [minor, patch]
+    ignore:
+      # Typings track the Node major that action.yml's `runs.using` declares.
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      github-actions:
+        patterns: ['*']
+        update-types: [minor, patch]
