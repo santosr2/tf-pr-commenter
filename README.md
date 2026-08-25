@@ -286,3 +286,5 @@ mise run package
 ```
 
 `dist/` is committed because GitHub Actions execute the bundled JavaScript.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for conventions and the release procedure.
