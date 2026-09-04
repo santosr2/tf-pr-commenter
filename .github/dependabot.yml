@@ -4,7 +4,8 @@ updates:
   # Production deps are bundled into the committed dist/, which CI verifies with
   # `git diff --exit-code -- dist`. Dependabot never runs the build, so a merged
   # bump here needs `mise run package` first. Grouping minor+patch keeps that to
-  # one rebuild instead of one per dependency; majors still arrive alone.
+  # one rebuild instead of one per dependency; majors arrive alone unless a
+  # group below opts them in.
   - package-ecosystem: npm
     directory: /
     schedule:
@@ -13,6 +14,12 @@ updates:
       prefix: chore
       include: scope
     groups:
+      # @vitest/coverage-v8 pins its peer dependency to the exact matching
+      # vitest version, so split major PRs can never pass `npm ci`. Majors for
+      # the pair must land in one PR.
+      vitest-major:
+        patterns: ['vitest', '@vitest/*']
+        update-types: [major]
       runtime-deps:
         dependency-type: production
         update-types: [minor, patch]
