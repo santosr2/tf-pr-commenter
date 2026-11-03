@@ -41,27 +41,27 @@ describe('jobUrlsByStack', () => {
   // Real shapes from a Terragrunt matrix: GitHub truncates the matrix portion at 100 chars
   // (note the "..."), but the reusable workflow's child suffix keeps the full path.
   const jobs = [
-    job('Plan (dev, us-east-2, demo, common, cdn, dev/us-east-2/demo/common/cdn) / plan - dev/us-east-2/demo/common/cdn'),
-    job('Plan (dev, us-east-2, moon, data_platform, airflow, dev/us-east-2/moon/data_platform/air... / plan - dev/us-east-2/moon/data_platform/airflow'),
-    job('Policy Check (dev, us-east-2, demo, common, cdn, dev/us-east-2/demo/common/cdn)'),
+    job('Plan (dev, us-west-2, edge, web, cdn, dev/us-west-2/edge/web/cdn) / plan - dev/us-west-2/edge/web/cdn'),
+    job('Plan (dev, us-west-2, lake, analytics_etl, airflow, dev/us-west-2/lake/analytics_etl/air... / plan - dev/us-west-2/lake/analytics_etl/airflow'),
+    job('Policy Check (dev, us-west-2, edge, web, cdn, dev/us-west-2/edge/web/cdn)'),
     job('Post PR Summary')
   ]
 
   it('links a stack to the matching plan job and ignores the policy job', () => {
-    const urls = jobUrlsByStack(jobs, ['dev/us-east-2/demo/common/cdn'], /plan/iu)
+    const urls = jobUrlsByStack(jobs, ['dev/us-west-2/edge/web/cdn'], /plan/iu)
 
-    expect(urls.get('dev/us-east-2/demo/common/cdn')).toBe(jobs[0]?.html_url)
-    expect(urls.get('dev/us-east-2/demo/common/cdn')).not.toBe(jobs[2]?.html_url)
+    expect(urls.get('dev/us-west-2/edge/web/cdn')).toBe(jobs[0]?.html_url)
+    expect(urls.get('dev/us-west-2/edge/web/cdn')).not.toBe(jobs[2]?.html_url)
   })
 
   it('matches a path that survives only in the truncated name suffix', () => {
     const urls = jobUrlsByStack(
       jobs,
-      ['dev/us-east-2/moon/data_platform/airflow'],
+      ['dev/us-west-2/lake/analytics_etl/airflow'],
       /plan/iu
     )
 
-    expect(urls.has('dev/us-east-2/moon/data_platform/airflow')).toBe(true)
+    expect(urls.has('dev/us-west-2/lake/analytics_etl/airflow')).toBe(true)
   })
 
   it('does not let a longer path claim a shorter one', () => {
@@ -81,7 +81,7 @@ describe('jobUrlsByStack', () => {
   })
 
   it('returns no urls when the jobs list is empty', () => {
-    expect(jobUrlsByStack([], ['dev/us-east-2/demo/common/cdn'], /plan/iu).size).toBe(0)
+    expect(jobUrlsByStack([], ['dev/us-west-2/edge/web/cdn'], /plan/iu).size).toBe(0)
   })
 })
 
@@ -91,10 +91,10 @@ describe('failedJobsBanner', () => {
   })
 
   it('renders a singular banner with the job name', () => {
-    const banner = failedJobsBanner(['Plan (dev/us-east-2/workera (run-all))'])
+    const banner = failedJobsBanner(['Plan (dev/us-west-2/platform (run-all))'])
     expect(banner).toContain('⚠️')
     expect(banner).toContain('**1 job failed or was cancelled**')
-    expect(banner).toContain('`Plan (dev/us-east-2/workera (run-all))`')
+    expect(banner).toContain('`Plan (dev/us-west-2/platform (run-all))`')
     expect(banner.startsWith('> ')).toBe(true)
   })
 
